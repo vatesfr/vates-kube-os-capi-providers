@@ -39,6 +39,42 @@ owned by the control plane provider and injected into the bootstrapping node;
 joining machines fetch their credentials from a live control plane's management
 API.
 
+## Install with clusterctl
+
+`clusterctl` sees **two** providers here. Build the artifacts and register both
+with a `file://` URL (a release repository does the same over https):
+
+```bash
+make release-manifests IMG=ghcr.io/vatesfr/vates-kube-os-capi-providers:v0.1.0
+# clusterctl reads each provider's metadata from its own override directory:
+for t in bootstrap control-plane; do
+  d=~/.config/cluster-api/overrides/$t-vates/v0.1.0
+  mkdir -p "$d" && cp dist/metadata.yaml "$d/"
+done
+```
+
+Then, in `~/.config/cluster-api/clusterctl.yaml`:
+
+```yaml
+providers:
+  - name: vates
+    type: BootstrapProvider
+    url: file:///ABS/PATH/CAVP/main/dist/bootstrap-components.yaml
+  - name: vates
+    type: ControlPlaneProvider
+    url: file:///ABS/PATH/CAVP/main/dist/controlplane-components.yaml
+  - name: vates
+    type: InfrastructureProvider
+    url: file:///ABS/PATH/CAPI/dist/infrastructure-components.yaml
+```
+
+```bash
+clusterctl init --bootstrap vates:v0.1.0 --control-plane vates:v0.1.0 --infrastructure vates:v0.1.0
+```
+
+The two managers run the **same image** with different `command`s
+(`/bootstrap-manager`, `/controlplane-manager`); both land in `cavp-system`.
+
 ## Build
 
 ```bash

@@ -28,6 +28,7 @@ help: ## Display this help.
 ##@ Development
 
 CONTROLLER_GEN ?= controller-gen
+KUSTOMIZE ?= kustomize
 
 .PHONY: manifests
 manifests: ## Generate CRDs and RBAC for both providers.
@@ -76,3 +77,20 @@ docker-build: ## Build the (single) image carrying both managers.
 .PHONY: docker-push
 docker-push:
 	$(CONTAINER_TOOL) push ${IMG}
+
+##@ Release
+
+# The two providers ship as TWO release artifacts: clusterctl identifies a
+# provider by (type, name), so one repo serving both is two entries in its
+# configuration, each pointed at its own components file. metadata.yaml is the
+# same document for both -- same release series, same contract.
+.PHONY: release-manifests
+release-manifests: manifests ## Generate the two providers' clusterctl artifacts.
+	mkdir -p dist
+	cd config/bootstrap/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
+	cd config/controlplane/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
+	"$(KUSTOMIZE)" build config/bootstrap/default > dist/bootstrap-components.yaml
+	"$(KUSTOMIZE)" build config/controlplane/default > dist/controlplane-components.yaml
+	cp metadata.yaml dist/
+	@echo "Release artifacts in dist/:"
+	@ls -l dist/

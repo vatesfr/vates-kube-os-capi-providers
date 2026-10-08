@@ -1,0 +1,13 @@
+# clusterctl metadata for BOTH providers this repo ships: the bootstrap provider
+# (CAVBP) and the control plane provider (CAVCPP).
+#
+# One document serves both. clusterctl identifies a provider by its (type, name)
+# pair, given in its own configuration, not here; the metadata only says which
+# release series exist and which Cluster API contract they speak. The contract is
+# also stamped on each CRD by hack/contractlabels, and the two must agree.
+apiVersion: clusterctl.cluster.x-k8s.io/v1alpha3
+kind: Metadata
+releaseSeries:
+  - major: 0
+    minor: 1
+    contract: v1beta2
