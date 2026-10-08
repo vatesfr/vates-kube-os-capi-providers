@@ -1,7 +1,7 @@
 # Adds namespace to all resources.
-namespace: capi-system
+namespace: cavp-system
 
-namePrefix: vates-kube-os-bootstrap-
+namePrefix: cavp-bootstrap-
 
 resources:
 - ../crd
