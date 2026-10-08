@@ -407,7 +407,7 @@ func (r *VatesBootstrapConfigReconciler) fillJoinMaterial(ctx context.Context, c
 	}
 	defer cl.Close()
 
-	callCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, joinCallTimeout)
 	defer cancel()
 
 	kubeconfig, err := cl.Kubeconfig(callCtx)
@@ -442,6 +442,19 @@ func (r *VatesBootstrapConfigReconciler) fillJoinMaterial(ctx context.Context, c
 // after twenty-four; half an hour is comfortably inside both, and long enough
 // that every machine of one scale-up reuses the same material.
 const joinMaterialTTL = 30 * time.Minute
+
+// joinCallTimeout bounds a single GetJoinMaterial/kubeconfig call.
+//
+// It has to exceed the node's own wait. Answering GetJoinMaterial first waits
+// for the controller-manager to publish the bootstrap token's signature -- up to
+// thirty attempts two seconds apart, so a minute -- before it uploads the
+// certificates. A shorter deadline times the call out while the node is still
+// working; the reconcile then retries and the node answers a second time, and on
+// a node that mints a fresh certificate key per upload the second answer
+// re-encrypts kubeadm-certs and strands the key already written into the first
+// document. The fix on the node side makes the upload idempotent; this margin
+// keeps us from provoking the retry in the first place.
+const joinCallTimeout = 2 * time.Minute
 
 // cachedJoinMaterial returns the cluster's join material, asking a live control
 // plane only when none is cached or the cached one is stale.
