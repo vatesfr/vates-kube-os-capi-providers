@@ -1,0 +1,20 @@
+apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
+kind: VatesBootstrapConfig
+metadata:
+  name: vatesbootstrapconfig-sample
+spec:
+  # kubernetesVersion is optional: the owner Cluster's spec.topology.version is
+  # used when it is empty.
+  kubernetesVersion: v1.31.4
+  cluster:
+    # The token is required for a worker; a control plane that bootstraps the
+    # cluster leaves it out.
+    token: "abcdef.0123456789abcdef"
+    vip:
+      address: 10.0.0.10
+  network:
+    iface: eth0
+    mode: dhcp
+  cni:
+    plugin: flannel
+    cidr: 10.244.0.0/16

@@ -1,0 +1,11 @@
+# Development image: the managers are built on the host (where the vates-kube-os
+# replace resolves) and copied into a scratch image. See the repo Dockerfile for
+# the self-contained build.
+#
+#   CGO_ENABLED=0 go build -o bin/bootstrap-manager ./cmd/bootstrap
+#   CGO_ENABLED=0 go build -o bin/controlplane-manager ./cmd/controlplane
+#   podman build -f Dockerfile.dev -t <img> .
+FROM scratch
+COPY bin/bootstrap-manager /bootstrap-manager
+COPY bin/controlplane-manager /controlplane-manager
+USER 65532:65532

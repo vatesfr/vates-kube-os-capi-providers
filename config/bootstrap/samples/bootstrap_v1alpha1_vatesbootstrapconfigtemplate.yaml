@@ -1,0 +1,14 @@
+apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
+kind: VatesBootstrapConfigTemplate
+metadata:
+  name: vatesbootstrapconfigtemplate-sample
+spec:
+  template:
+    spec:
+      kubernetesVersion: v1.31.4
+      network:
+        iface: eth0
+        mode: dhcp
+      cni:
+        plugin: flannel
+        cidr: 10.244.0.0/16

@@ -1,0 +1,15 @@
+# This kustomization.yaml is not intended to be run by itself,
+# since it depends on service name and namespace that are out of this kustomize package.
+# It should be run by config/default
+resources:
+- bases/bootstrap.cluster.x-k8s.io_vatesbootstrapconfigs.yaml
+- bases/bootstrap.cluster.x-k8s.io_vatesbootstrapconfigtemplates.yaml
+# +kubebuilder:scaffold:crdkustomizeresource
+
+labels:
+- pairs:
+    cluster.x-k8s.io/provider: bootstrap-vates
+    # The contract label (cluster.x-k8s.io/<contract>: <served-apiVersion>) is
+    # NOT set here: it is stamped onto the generated CRDs by
+    # `go run ./hack/contractlabels`, derived from the Cluster API core API the
+    # module imports and the version the CRD serves.

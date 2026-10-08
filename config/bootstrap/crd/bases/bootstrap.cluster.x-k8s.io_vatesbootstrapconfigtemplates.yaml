@@ -1,0 +1,287 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  labels:
+    cluster.x-k8s.io/v1beta2: v1alpha1
+  name: vatesbootstrapconfigtemplates.bootstrap.cluster.x-k8s.io
+spec:
+  group: bootstrap.cluster.x-k8s.io
+  names:
+    categories:
+    - cluster-api
+    kind: VatesBootstrapConfigTemplate
+    listKind: VatesBootstrapConfigTemplateList
+    plural: vatesbootstrapconfigtemplates
+    shortNames:
+    - vbct
+    singular: vatesbootstrapconfigtemplate
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          VatesBootstrapConfigTemplate is the Schema for the
+          vatesbootstrapconfigtemplates API. It exists so a MachineDeployment or a
+          ClusterClass can stamp out per-machine VatesBootstrapConfigs.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              VatesBootstrapConfigTemplateSpec is the desired state of a
+              VatesBootstrapConfigTemplate.
+            properties:
+              template:
+                description: |-
+                  Template is the template that describes the VatesBootstrapConfig created
+                  from it.
+                properties:
+                  spec:
+                    description: Spec is the spec of the VatesBootstrapConfig created
+                      from this template.
+                    properties:
+                      api:
+                        description: API configures the node's management API.
+                        properties:
+                          port:
+                            description: |-
+                              Port is the TCP port the management API listens on. Optional; defaults
+                              to 50000.
+                            maximum: 65535
+                            minimum: 1
+                            type: integer
+                        type: object
+                      binaries:
+                        description: Binaries says where the Kubernetes binaries come
+                          from.
+                        properties:
+                          base:
+                            description: |-
+                              Base is the prefix the Kubernetes layout hangs under. Optional; empty
+                              means https://dl.k8s.io/release.
+                            type: string
+                        type: object
+                      cloud:
+                        description: Cloud is the node's relationship with an external
+                          cloud provider.
+                        properties:
+                          manifests:
+                            description: |-
+                              Manifests are applied by the bootstrap once the kubelet is up. Each entry
+                              is an http(s) URL.
+                            items:
+                              type: string
+                            type: array
+                          provider:
+                            description: |-
+                              Provider is the external provider the kubelet defers to. Only "external"
+                              is accepted.
+                            enum:
+                            - external
+                            type: string
+                        type: object
+                      cluster:
+                        description: |-
+                          Cluster carries the cluster-level settings that cannot be derived from
+                          the CAPI objects.
+                        properties:
+                          caCertHash:
+                            description: |-
+                              CACertHash is the sha256 of the cluster's CA certificate. Required with
+                              certificateKey.
+                            type: string
+                          certificateKey:
+                            description: |-
+                              CertificateKey is kubeadm's --certificate-key, for a joining control
+                              plane. It expires (kubeadm gives it two hours), so the provider must fetch
+                              it when the machine is about to be created, never store it.
+                            type: string
+                          controlPlaneEndpoint:
+                            description: |-
+                              ControlPlaneEndpoint overrides the owner Cluster's
+                              spec.controlPlaneEndpoint. Optional; normally left empty so the endpoint
+                              comes from the Cluster.
+                            type: string
+                          dnsDomain:
+                            description: |-
+                              DNSDomain is the cluster's DNS domain. Optional; defaults to
+                              "cluster.local".
+                            type: string
+                          proxy:
+                            description: Proxy controls kube-proxy, which kubeadm
+                              installs with its addons.
+                            properties:
+                              disabled:
+                                description: |-
+                                  Disabled omits kube-proxy, for a CNI that replaces it in eBPF. It is only
+                                  valid with cni.plugin: none.
+                                type: boolean
+                            type: object
+                          serviceCIDR:
+                            description: |-
+                              ServiceCIDR is the range Service addresses are allocated from. Optional;
+                              defaults to kubeadm's 10.96.0.0/12.
+                            type: string
+                          token:
+                            description: |-
+                              Token is the kubeadm bootstrap token, "abcdef.0123456789abcdef". Required
+                              for a worker, which uses it to join. Optional on a master, which creates
+                              the cluster instead of joining it.
+                            type: string
+                          vip:
+                            description: VIP makes this control plane node participate
+                              in owning a virtual IP.
+                            properties:
+                              address:
+                                description: Address is the virtual address to own,
+                                  e.g. "192.168.1.10".
+                                type: string
+                              interface:
+                                description: |-
+                                  Interface is the interface to announce on. Optional; defaults to the
+                                  node's network interface.
+                                type: string
+                            type: object
+                        type: object
+                      cni:
+                        description: CNI selects the pod network.
+                        properties:
+                          cidr:
+                            description: CIDR is the pod network, e.g. "10.244.0.0/16".
+                            type: string
+                          plugin:
+                            description: |-
+                              Plugin is the CNI implementation: "flannel" is installed by the node,
+                              "none" leaves the CNI to the operator.
+                            enum:
+                            - flannel
+                            - none
+                            type: string
+                        required:
+                        - cidr
+                        - plugin
+                        type: object
+                      dashboard:
+                        description: Dashboard is what the machine shows on its console.
+                        properties:
+                          mode:
+                            description: Mode is "tui" or "gui". Optional; defaults
+                              to "gui".
+                            enum:
+                            - tui
+                            - gui
+                            type: string
+                        type: object
+                      kubernetesVersion:
+                        description: |-
+                          KubernetesVersion is the Kubernetes release to run, e.g. "v1.31.0".
+                          Optional: when empty the owner Cluster's spec.topology.version is used.
+                        type: string
+                      network:
+                        description: Network is the node's own addressing.
+                        properties:
+                          cidr:
+                            description: CIDR is the node address in CIDR form. Required
+                              when mode is static.
+                            type: string
+                          dns:
+                            description: DNS is an optional list of resolvers.
+                            items:
+                              type: string
+                            type: array
+                          gateway:
+                            description: Gateway is the default route. Required when
+                              mode is static.
+                            type: string
+                          iface:
+                            description: Iface is the network interface to configure,
+                              e.g. "eth0".
+                            type: string
+                          mode:
+                            description: Mode is "dhcp" or "static".
+                            enum:
+                            - dhcp
+                            - static
+                            type: string
+                        required:
+                        - iface
+                        - mode
+                        type: object
+                      registry:
+                        description: Registry says where this node's container images
+                          come from.
+                        properties:
+                          kubernetes:
+                            description: |-
+                              Kubernetes is the base for the cluster's own images. Optional; empty
+                              means registry.k8s.io.
+                            type: string
+                          mirrors:
+                            description: Mirrors rewrite the other images.
+                            items:
+                              description: VatesRegistryMirror redirects one upstream
+                                host to a mirror.
+                              properties:
+                                host:
+                                  description: Host is the upstream registry, e.g.
+                                    "ghcr.io".
+                                  type: string
+                                replace:
+                                  description: Replace is where that host's images
+                                    are found instead, without a scheme.
+                                  type: string
+                              required:
+                              - host
+                              - replace
+                              type: object
+                            type: array
+                        type: object
+                      time:
+                        description: Time is how the node keeps its clock.
+                        properties:
+                          servers:
+                            description: |-
+                              Servers are the NTP servers to synchronize from. Optional; falls back to
+                              the public pool.
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                    required:
+                    - cni
+                    - network
+                    type: object
+                required:
+                - spec
+                type: object
+            required:
+            - template
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: null
+  storedVersions: null

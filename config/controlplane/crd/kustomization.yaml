@@ -1,0 +1,25 @@
+# This kustomization.yaml is not intended to be run by itself,
+# since it depends on service name and namespace that are out of this kustomize package.
+# It should be run by config/default
+resources:
+- bases/controlplane.cluster.x-k8s.io_vatescontrolplanes.yaml
+- bases/controlplane.cluster.x-k8s.io_vatescontrolplanetemplates.yaml
+# +kubebuilder:scaffold:crdkustomizeresource
+
+labels:
+- pairs:
+    cluster.x-k8s.io/provider: control-plane-vates
+    # The contract label (cluster.x-k8s.io/<contract>: <served-apiVersion>) is
+    # NOT set here: it is stamped onto the generated CRDs by
+    # `go run ./hack/contractlabels`, derived from the Cluster API core API the
+    # module imports and the version the CRD serves.
+
+patches:
+# [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
+# patches here are for enabling the conversion webhook for each CRD
+# +kubebuilder:scaffold:crdkustomizewebhookpatch
+
+# [WEBHOOK] To enable webhook, uncomment the following section
+# the following config is for teaching kustomize how to do kustomization for CRDs.
+#configurations:
+#- kustomizeconfig.yaml

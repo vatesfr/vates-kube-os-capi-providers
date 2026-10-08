@@ -1,0 +1,17 @@
+# Adds namespace to all resources.
+namespace: capi-system
+
+namePrefix: vates-kube-os-bootstrap-
+
+resources:
+- ../crd
+- ../rbac
+- ../manager
+# [METRICS] Expose the controller manager metrics service.
+- metrics_service.yaml
+
+patches:
+# [METRICS] The following patch will enable the metrics endpoint using HTTPS and the port :8443.
+- path: manager_metrics_patch.yaml
+  target:
+    kind: Deployment

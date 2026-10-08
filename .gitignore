@@ -1,0 +1,18 @@
+# Binaries and generated output
+bin/*
+Dockerfile.cross
+dist/
+cover.out
+*.test
+
+# Go workspace
+go.work
+go.work.sum
+
+# Env / editor
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+*.swp
