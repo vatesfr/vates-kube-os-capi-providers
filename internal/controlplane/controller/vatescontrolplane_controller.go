@@ -51,6 +51,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	controlplanev1alpha1 "github.com/vatesfr/vates-kube-os-capi-providers/api/controlplane/v1alpha1"
+	"github.com/vatesfr/vates-kube-os-capi-providers/internal/controlplane/etcd"
 	"github.com/vatesfr/vates-kube-os-capi-providers/internal/controlplane/pki"
 )
 
@@ -221,7 +222,7 @@ func (r *VatesControlPlaneReconciler) reconcileMachines(ctx context.Context, vcp
 	// is going away is indexed separately rather than dropped: its index is
 	// still taken by the name it holds until it is gone.
 	byIndex := map[int]clusterv1.Machine{}
-	terminating := map[int]bool{}
+	terminating := map[int]clusterv1.Machine{}
 	for i := range machines.Items {
 		m := machines.Items[i]
 		idx, ok := machineIndex(vcp.Name, m.Name)
@@ -229,10 +230,27 @@ func (r *VatesControlPlaneReconciler) reconcileMachines(ctx context.Context, vcp
 			continue
 		}
 		if !m.DeletionTimestamp.IsZero() {
-			terminating[idx] = true
+			terminating[idx] = m
 			continue
 		}
 		byIndex[idx] = m
+	}
+
+	// Every control plane machine on its way out takes its etcd member with it,
+	// and does so before the scale-up below fills its index. That order is the
+	// whole point: adding the replacement's member first raises the quorum --
+	// three members with one down go from needing two votes to needing three --
+	// which buys no fault tolerance and leaves the cluster one failure away from
+	// losing its data for good.
+	//
+	// The removal runs on a control plane that is staying, never on the member
+	// being removed: that member is the one most likely to be down, which is
+	// usually why it is being replaced at all.
+	departing := departingNames(byIndex, terminating, desired)
+	if host, ok := etcdHost(byIndex, departing, desired); ok && len(departing) > 0 {
+		if err := r.removeEtcdMembers(ctx, cluster, host, departing); err != nil {
+			return nil, err
+		}
 	}
 
 	// Scale down: delete the highest indices beyond the desired count.
@@ -278,18 +296,101 @@ func (r *VatesControlPlaneReconciler) reconcileMachines(ctx context.Context, vcp
 // recreating it, with a VM created on every round and the Machine never
 // finishing its deletion. Owns(&Machine{}) requeues this reconcile once the
 // name is free.
-func pendingIndices(desired int, live map[int]clusterv1.Machine, terminating map[int]bool) []int {
+func pendingIndices(desired int, live, terminating map[int]clusterv1.Machine) []int {
 	var out []int
 	for idx := 0; idx < desired; idx++ {
 		if _, ok := live[idx]; ok {
 			continue
 		}
-		if terminating[idx] {
+		if _, ok := terminating[idx]; ok {
 			continue
 		}
 		out = append(out, idx)
 	}
 	return out
+}
+
+// departingNames lists the control plane machines that are on their way out:
+// the ones already terminating, plus the ones above the desired count that the
+// scale-down is about to delete. Their etcd members go with them.
+func departingNames(live, terminating map[int]clusterv1.Machine, desired int) []string {
+	names := make([]string, 0, len(terminating))
+	for idx := range terminating {
+		names = append(names, terminating[idx].Name)
+	}
+	for idx := desired; ; idx++ {
+		m, ok := live[idx]
+		if !ok {
+			break
+		}
+		names = append(names, m.Name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// etcdHost picks the control plane whose etcd pod the removal runs in: one that
+// is staying. Any member can remove any other, so there is never a reason to
+// run it on the one going away -- and a good reason not to, since that member is
+// the one most likely to be down.
+func etcdHost(live map[int]clusterv1.Machine, departing []string, desired int) (string, bool) {
+	gone := make(map[string]bool, len(departing))
+	for _, name := range departing {
+		gone[name] = true
+	}
+	for idx := 0; idx < desired; idx++ {
+		m, ok := live[idx]
+		if !ok || gone[m.Name] {
+			continue
+		}
+		return m.Name, true
+	}
+	return "", false
+}
+
+// removeEtcdMembers takes the etcd member of each departing machine out of the
+// cluster, through the etcd pod running on host.
+//
+// A member that is already gone is not an error: this is retried on every
+// reconcile, so the second attempt has to be a no-op. A failure that would leave
+// a member behind IS returned, because that is the state this step exists to
+// prevent -- the next machine to replace the one that left would be added on top
+// of a member that is still counted.
+func (r *VatesControlPlaneReconciler) removeEtcdMembers(ctx context.Context, cluster *clusterv1.Cluster, host string, names []string) error {
+	logger := log.FromContext(ctx)
+
+	client, err := r.etcdClient(ctx, cluster, host)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		removed, err := client.RemoveMemberNamed(ctx, name)
+		if err != nil {
+			return fmt.Errorf("removing the etcd member of %s: %w", name, err)
+		}
+		if removed {
+			logger.Info("Removed the etcd member of a departing control plane machine", "machine", name)
+		}
+	}
+	return nil
+}
+
+// etcdClient reaches etcd through the static pod that runs it on host. The
+// provider owns the cluster's admin kubeconfig, and the pod carries etcdctl and
+// the member's certificates, so nothing else is needed to talk to etcd.
+func (r *VatesControlPlaneReconciler) etcdClient(ctx context.Context, cluster *clusterv1.Cluster, host string) (*etcd.Client, error) {
+	raw, err := kubeconfig.FromSecret(ctx, r.Client, util.ObjectKey(cluster))
+	if err != nil {
+		return nil, fmt.Errorf("reading the cluster kubeconfig: %w", err)
+	}
+	cfg, err := clientcmd.RESTConfigFromKubeConfig(raw)
+	if err != nil {
+		return nil, fmt.Errorf("building the workload cluster client: %w", err)
+	}
+	// Long enough for an exec into a busy pod, short enough that a reconcile
+	// does not park on a control plane that is going away.
+	cfg.Timeout = 30 * time.Second
+	return etcd.New(cfg, host)
 }
 
 // machineIndex extracts the numeric index from a Machine name shaped
