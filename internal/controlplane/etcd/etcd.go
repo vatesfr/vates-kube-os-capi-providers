@@ -164,10 +164,17 @@ func (c *Client) memberList(ctx context.Context) ([]Member, error) {
 
 // remove removes one member by ID.
 func (c *Client) remove(ctx context.Context, id uint64) error {
-	if _, err := c.etcdctl(ctx, "member", "remove", strconv.FormatUint(id, 10)); err != nil {
-		return fmt.Errorf("etcd: removing member %d: %w", id, err)
+	if _, err := c.etcdctl(ctx, "member", "remove", memberIDArg(id)); err != nil {
+		return fmt.Errorf("etcd: removing member %s: %w", memberIDArg(id), err)
 	}
 	return nil
+}
+
+// memberIDArg renders a member ID the way etcdctl wants it: in hex, not in the
+// decimal that `member list -w json` reports. Passing the decimal fails with
+// "expecting ID in Hex", which is the mistake this names.
+func memberIDArg(id uint64) string {
+	return strconv.FormatUint(id, 16)
 }
 
 // healthyClientURLs probes every member of the cluster and returns the ones

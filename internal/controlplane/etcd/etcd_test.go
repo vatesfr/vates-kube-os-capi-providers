@@ -172,6 +172,28 @@ func TestParseMembers(t *testing.T) {
 	}
 }
 
+func TestMemberIDArg(t *testing.T) {
+	// The ID a live cluster reported for vates-mp-2, and the hex it printed for
+	// it in `member list`. etcdctl takes the hex and rejects the decimal.
+	tests := []struct {
+		name string
+		id   uint64
+		want string
+	}{
+		{name: "renders the member ID in hex", id: 7466374575268487584, want: "679de41e1ee2e1a0"},
+		{name: "renders zero", id: 0, want: "0"},
+		{name: "renders the largest ID etcd can hold", id: ^uint64(0), want: "ffffffffffffffff"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := memberIDArg(tt.id); got != tt.want {
+				t.Errorf("memberIDArg(%d) = %q, want %q", tt.id, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseHealth(t *testing.T) {
 	// The real shape: one line per member, healthy or not, and a member that
 	// could not be reached at all may simply be missing.
