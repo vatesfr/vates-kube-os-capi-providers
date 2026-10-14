@@ -422,7 +422,9 @@ func (r *VatesBootstrapConfigReconciler) fillJoinMaterial(ctx context.Context, c
 		return err
 	}
 
-	jm, err := r.cachedJoinMaterial(ctx, cluster, cl, callCtx)
+	jm, err := r.cachedJoinMaterial(ctx, cluster, func(context.Context) (vatesapi.JoinMaterial, error) {
+		return cl.GetJoinMaterial(callCtx)
+	})
 	if err != nil {
 		return err
 	}
@@ -474,7 +476,10 @@ const joinCallTimeout = 2 * time.Minute
 //
 // One fetch serves a whole scale-up, the way a control plane provider hands the
 // same certificate key to every machine of a rollout.
-func (r *VatesBootstrapConfigReconciler) cachedJoinMaterial(ctx context.Context, cluster *clusterv1.Cluster, cl *vatesapi.Client, callCtx context.Context) (vatesapi.JoinMaterial, error) {
+//
+// fetch asks a live control plane for fresh material; it is a parameter rather
+// than a call on a client so the caching rules below can be tested without one.
+func (r *VatesBootstrapConfigReconciler) cachedJoinMaterial(ctx context.Context, cluster *clusterv1.Cluster, fetch func(context.Context) (vatesapi.JoinMaterial, error)) (vatesapi.JoinMaterial, error) {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name + "-join-material"}
 
 	secret := &corev1.Secret{}
@@ -490,7 +495,7 @@ func (r *VatesBootstrapConfigReconciler) cachedJoinMaterial(ctx context.Context,
 	// One worker reconciles this controller, so the fetch below never races
 	// another: the first machine of a scale-up stores the material, the rest
 	// read it back.
-	jm, err := cl.GetJoinMaterial(callCtx)
+	jm, err := fetch(ctx)
 	if err != nil {
 		return vatesapi.JoinMaterial{}, err
 	}
@@ -512,15 +517,27 @@ func (r *VatesBootstrapConfigReconciler) cachedJoinMaterial(ctx context.Context,
 			"fetchedAt":      []byte(time.Now().UTC().Format(time.RFC3339)),
 		},
 	}
-	if err := r.Create(ctx, desired); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return vatesapi.JoinMaterial{}, err
-		}
-		// Another reconcile created it first; read what it stored.
-		if err := r.Get(ctx, key, secret); err != nil {
-			return vatesapi.JoinMaterial{}, err
-		}
-		return joinMaterialFromSecret(secret), nil
+	switch err := r.Create(ctx, desired); {
+	case err == nil:
+		return jm, nil
+	case !apierrors.IsAlreadyExists(err):
+		return vatesapi.JoinMaterial{}, err
+	}
+
+	// The Secret is there but stale. Overwrite it with what was just fetched.
+	// Reading it back instead -- which is what this did -- hands the machine the
+	// token and certificate key of a previous life of the cluster: the join then
+	// fails on a token the cluster does not know, or on a certificate key
+	// kubeadm expired two hours after it was uploaded, and the machine never
+	// becomes a control plane. A stale cache is the normal case for a scale-up
+	// that happens later than half an hour after the last one.
+	current := &corev1.Secret{}
+	if err := r.Get(ctx, key, current); err != nil {
+		return vatesapi.JoinMaterial{}, err
+	}
+	current.Data = desired.Data
+	if err := r.Update(ctx, current); err != nil {
+		return vatesapi.JoinMaterial{}, err
 	}
 	return jm, nil
 }
