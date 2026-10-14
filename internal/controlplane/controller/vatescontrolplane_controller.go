@@ -267,7 +267,20 @@ func (r *VatesControlPlaneReconciler) reconcileMachines(ctx context.Context, vcp
 	}
 
 	// Scale up: create the missing indices.
+	//
+	// The member's name is the machine's name, so an index is not free as long
+	// as a member of that name is still in etcd -- whatever the Machine list
+	// says. Removing it here rather than only when a Machine is seen
+	// terminating is what makes the order hold when the Machine is already
+	// gone: a replacement is never added on top of a member that is still
+	// counted.
 	for _, idx := range pendingIndices(desired, byIndex, terminating) {
+		if host, ok := etcdHost(byIndex, departing, desired); ok {
+			name := fmt.Sprintf("%s-%d", vcp.Name, idx)
+			if err := r.removeEtcdMembers(ctx, cluster, host, []string{name}); err != nil {
+				return nil, err
+			}
+		}
 		if err := r.createControlPlaneMachine(ctx, vcp, cluster, idx); err != nil {
 			return nil, err
 		}
