@@ -217,16 +217,22 @@ func (r *VatesControlPlaneReconciler) reconcileMachines(ctx context.Context, vcp
 
 	desired := int(ptr.Deref(vcp.Spec.Replicas, 1))
 
-	// Index the machines we already have by their numeric suffix.
+	// Index the machines we already have by their numeric suffix. A Machine that
+	// is going away is indexed separately rather than dropped: its index is
+	// still taken by the name it holds until it is gone.
 	byIndex := map[int]clusterv1.Machine{}
+	terminating := map[int]bool{}
 	for i := range machines.Items {
 		m := machines.Items[i]
-		if !m.DeletionTimestamp.IsZero() {
+		idx, ok := machineIndex(vcp.Name, m.Name)
+		if !ok {
 			continue
 		}
-		if idx, ok := machineIndex(vcp.Name, m.Name); ok {
-			byIndex[idx] = m
+		if !m.DeletionTimestamp.IsZero() {
+			terminating[idx] = true
+			continue
 		}
+		byIndex[idx] = m
 	}
 
 	// Scale down: delete the highest indices beyond the desired count.
@@ -243,10 +249,7 @@ func (r *VatesControlPlaneReconciler) reconcileMachines(ctx context.Context, vcp
 	}
 
 	// Scale up: create the missing indices.
-	for idx := 0; idx < desired; idx++ {
-		if _, ok := byIndex[idx]; ok {
-			continue
-		}
+	for _, idx := range pendingIndices(desired, byIndex, terminating) {
 		if err := r.createControlPlaneMachine(ctx, vcp, cluster, idx); err != nil {
 			return nil, err
 		}
@@ -261,6 +264,32 @@ func (r *VatesControlPlaneReconciler) reconcileMachines(ctx context.Context, vcp
 		return nil, err
 	}
 	return fresh.Items, nil
+}
+
+// pendingIndices returns the indices the control plane still has to create:
+// every index below desired that no live Machine occupies and no terminating
+// Machine is still holding.
+//
+// A terminating Machine holds its index on purpose. It keeps its name until it
+// is gone, and it is gone only once the infrastructure object it references has
+// been deleted -- which the Machine controller does on its own. Recreating the
+// index now would recreate that object under the same name, and the two
+// controllers would fight over it: the Machine controller deleting it, this one
+// recreating it, with a VM created on every round and the Machine never
+// finishing its deletion. Owns(&Machine{}) requeues this reconcile once the
+// name is free.
+func pendingIndices(desired int, live map[int]clusterv1.Machine, terminating map[int]bool) []int {
+	var out []int
+	for idx := 0; idx < desired; idx++ {
+		if _, ok := live[idx]; ok {
+			continue
+		}
+		if terminating[idx] {
+			continue
+		}
+		out = append(out, idx)
+	}
+	return out
 }
 
 // machineIndex extracts the numeric index from a Machine name shaped
