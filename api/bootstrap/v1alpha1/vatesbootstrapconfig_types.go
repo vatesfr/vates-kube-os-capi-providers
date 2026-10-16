@@ -133,7 +133,8 @@ type VatesVIP struct {
 // VatesProxy controls kube-proxy.
 type VatesProxy struct {
 	// Disabled omits kube-proxy, for a CNI that replaces it in eBPF. It is only
-	// valid with cni.plugin: none.
+	// valid with cni.plugin: none: flannel and cilium, as the node installs
+	// them, run alongside kube-proxy and do not replace it.
 	// +optional
 	Disabled bool `json:"disabled,omitempty"`
 }
@@ -162,12 +163,16 @@ type VatesNetwork struct {
 
 // VatesCNI selects the pod network.
 type VatesCNI struct {
-	// Plugin is the CNI implementation: "flannel" is installed by the node,
-	// "none" leaves the CNI to the operator.
-	// +kubebuilder:validation:Enum=flannel;none
-	Plugin string `json:"plugin"`
+	// Plugin is the CNI implementation. Optional; defaults to "flannel". Both
+	// "flannel" and "cilium" are installed by the node itself -- an embedded,
+	// pinned manifest the node applies at first boot -- and both run alongside
+	// kube-proxy. "none" leaves the CNI to the operator, which is how a CNI
+	// that replaces kube-proxy is installed.
+	// +optional
+	// +kubebuilder:validation:Enum=flannel;cilium;none
+	Plugin string `json:"plugin,omitempty"`
 
-	// CIDR is the pod network, e.g. "10.244.0.0/16".
+	// CIDR is the pod network, e.g. "10.244.0.0/16". Required.
 	CIDR string `json:"cidr"`
 }
 

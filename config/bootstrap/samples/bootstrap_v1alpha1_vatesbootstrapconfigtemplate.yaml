@@ -10,5 +10,7 @@ spec:
         iface: eth0
         mode: dhcp
       cni:
+        # flannel (default) | cilium, both installed by the node, or none to
+        # leave the CNI to the operator.
         plugin: flannel
         cidr: 10.244.0.0/16
