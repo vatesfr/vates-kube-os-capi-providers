@@ -54,5 +54,5 @@ jobs:
 
           gh release create "$TAG" "${flags[@]}" --verify-tag --generate-notes \
             dist/bootstrap-components.yaml \
-            dist/controlplane-components.yaml \
+            dist/control-plane-components.yaml \
             dist/metadata.yaml
