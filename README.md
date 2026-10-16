@@ -47,8 +47,42 @@ API.
 
 ## Install with clusterctl
 
-`clusterctl` sees **two** providers here. Build the artifacts and register both
-with a `file://` URL (a release repository does the same over https):
+`clusterctl` sees **two** providers here (bootstrap and control plane); the
+infrastructure half is
+[cluster-api-provider-vates](https://github.com/vatesfr/cluster-api-provider-vates).
+The releases of this repository carry the components files; point each provider
+at the file of the release you want (the URL must name the components file
+itself):
+
+```yaml
+# ~/.config/cluster-api/clusterctl.yaml
+providers:
+  - name: vates
+    type: BootstrapProvider
+    url: https://github.com/vatesfr/vates-kube-os-capi-providers/releases/latest/bootstrap-components.yaml
+  - name: vates
+    type: ControlPlaneProvider
+    url: https://github.com/vatesfr/vates-kube-os-capi-providers/releases/latest/control-plane-components.yaml
+  - name: vates
+    type: InfrastructureProvider
+    url: https://github.com/vatesfr/cluster-api-provider-vates/releases/latest/infrastructure-components.yaml
+```
+
+```bash
+clusterctl init \
+  --bootstrap      vates:v0.1.0 \
+  --control-plane  vates:v0.1.0 \
+  --infrastructure vates:<version>
+```
+
+The two managers run the **same image**
+(`ghcr.io/vatesfr/vates-kube-os-capi-providers`) with different `command`s
+(`/bootstrap-manager`, `/controlplane-manager`); both land in `cavp-system`.
+
+### From a local build
+
+To install artifacts that are not released yet, build them and point the URLs
+at the files instead:
 
 ```bash
 make release-manifests IMG=ghcr.io/vatesfr/vates-kube-os-capi-providers:v0.1.0
@@ -59,27 +93,8 @@ for t in bootstrap control-plane; do
 done
 ```
 
-Then, in `~/.config/cluster-api/clusterctl.yaml`:
-
-```yaml
-providers:
-  - name: vates
-    type: BootstrapProvider
-    url: file:///ABS/PATH/CAVP/main/dist/bootstrap-components.yaml
-  - name: vates
-    type: ControlPlaneProvider
-    url: file:///ABS/PATH/CAVP/main/dist/control-plane-components.yaml
-  - name: vates
-    type: InfrastructureProvider
-    url: file:///ABS/PATH/CAPI/dist/infrastructure-components.yaml
-```
-
-```bash
-clusterctl init --bootstrap vates:v0.1.0 --control-plane vates:v0.1.0 --infrastructure vates:v0.1.0
-```
-
-The two managers run the **same image** with different `command`s
-(`/bootstrap-manager`, `/controlplane-manager`); both land in `cavp-system`.
+Then use `url: file:///ABS/PATH/.../dist/bootstrap-components.yaml` (and
+`control-plane-components.yaml`) in the config above.
 
 ## Build
 
