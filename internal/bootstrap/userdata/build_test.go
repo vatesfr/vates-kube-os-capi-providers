@@ -311,3 +311,100 @@ func TestUserDataRoundTripsThroughTheOSSchema(t *testing.T) {
 		})
 	}
 }
+
+// The CNI choice is the OS schema's, not this provider's: whatever cni.plugin
+// the CAPI object states is carried into vates-node.yaml and accepted by the
+// node's own validation. "flannel" and "cilium" are both installed by the node
+// and run alongside kube-proxy; an omitted plugin defaults to flannel, exactly
+// as it does on the node.
+func TestUserDataCarriesTheCNIPluginThroughTheOSSchema(t *testing.T) {
+	tests := []struct {
+		name   string
+		plugin string
+		want   string
+	}{
+		{name: "flannel is installed by the node", plugin: "flannel", want: "flannel"},
+		{name: "cilium is installed by the node", plugin: "cilium", want: "cilium"},
+		{name: "none is left to the operator", plugin: "none", want: "none"},
+		{name: "an omitted plugin defaults to flannel, as on the node", plugin: "", want: "flannel"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			config := &bootstrapv1.VatesBootstrapConfig{
+				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+					Network: validNetwork(),
+					CNI:     bootstrapv1.VatesCNI{Plugin: tt.plugin, CIDR: "10.244.0.0/16"},
+				},
+			}
+			cluster := clusterWith("v1.31.4", "10.0.0.10", 6443)
+			machine := machineWithLabels(map[string]string{clusterv1.MachineControlPlaneLabel: ""})
+
+			raw, err := UserData(config, cluster, machine)
+			if err != nil {
+				t.Fatalf("UserData() unexpected error = %v", err)
+			}
+
+			doc, ok := vatescfg.FromUserData(raw)
+			if !ok {
+				t.Fatal("FromUserData() reported no content")
+			}
+			got, err := vatescfg.Load(doc)
+			if err != nil {
+				t.Fatalf("the OS schema rejected cni.plugin %q: %v", tt.plugin, err)
+			}
+			if got.CNI.Plugin != tt.want {
+				t.Errorf("CNI.Plugin = %q, want %q", got.CNI.Plugin, tt.want)
+			}
+		})
+	}
+}
+
+// kube-proxy is kubeadm's Service implementation. Neither flannel nor cilium,
+// as the node installs them, replaces it, so the OS schema refuses
+// proxy.disabled with anything but cni.plugin: none -- and the provider surfaces
+// that refusal rather than encoding a cluster whose Services would silently do
+// nothing.
+func TestProxyDisabledIsRefusedUnlessTheCNIIsNone(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugin  string
+		wantErr bool
+	}{
+		{name: "flannel plus proxy.disabled is refused", plugin: "flannel", wantErr: true},
+		{name: "cilium plus proxy.disabled is refused", plugin: "cilium", wantErr: true},
+		{name: "none plus proxy.disabled is accepted", plugin: "none", wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			config := &bootstrapv1.VatesBootstrapConfig{
+				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+					Network: validNetwork(),
+					CNI:     bootstrapv1.VatesCNI{Plugin: tt.plugin, CIDR: "10.244.0.0/16"},
+					Cluster: bootstrapv1.VatesCluster{Proxy: &bootstrapv1.VatesProxy{Disabled: true}},
+				},
+			}
+			cluster := clusterWith("v1.31.4", "10.0.0.10", 6443)
+			machine := machineWithLabels(map[string]string{clusterv1.MachineControlPlaneLabel: ""})
+
+			_, err := UserData(config, cluster, machine)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("UserData() succeeded with cni.plugin %q and proxy.disabled, want a refusal", tt.plugin)
+				}
+				if !strings.Contains(err.Error(), "cluster.proxy.disabled requires cni.plugin: none") {
+					t.Errorf("error = %q, want it to name the proxy/CNI rule", err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("UserData() unexpected error = %v", err)
+			}
+		})
+	}
+}
