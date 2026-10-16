@@ -5,6 +5,12 @@ a **bootstrap** provider and a **control plane** provider, in one repository —
 the model upstream [Cluster API](https://cluster-api.sigs.k8s.io/) uses for its
 kubeadm providers (`bootstrap/kubeadm` + `controlplane/kubeadm`).
 
+> [!WARNING]
+> **Experimental — no support, not for production.**
+> These providers are a work in progress: they are **not supported** by Vates,
+> and they are **not recommended for production use**. Expect breaking changes
+> and data loss; evaluate them at your own risk.
+
 They are two **providers** to Cluster API (and `clusterctl`), shipped from one
 module:
 
