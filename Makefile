@@ -83,14 +83,17 @@ docker-push:
 # The two providers ship as TWO release artifacts: clusterctl identifies a
 # provider by (type, name), so one repo serving both is two entries in its
 # configuration, each pointed at its own components file. metadata.yaml is the
-# same document for both -- same release series, same contract.
+# same document for both -- same release series, same contract. The file names
+# follow clusterctl's convention (bootstrap-components.yaml,
+# control-plane-components.yaml); the hyphen in control-plane is clusterctl's,
+# not the source directory's (config/controlplane).
 .PHONY: release-manifests
 release-manifests: manifests ## Generate the two providers' clusterctl artifacts.
 	mkdir -p dist
 	cd config/bootstrap/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	cd config/controlplane/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KUSTOMIZE)" build config/bootstrap/default > dist/bootstrap-components.yaml
-	"$(KUSTOMIZE)" build config/controlplane/default > dist/controlplane-components.yaml
+	"$(KUSTOMIZE)" build config/controlplane/default > dist/control-plane-components.yaml
 	cp metadata.yaml dist/
 	@echo "Release artifacts in dist/:"
 	@ls -l dist/

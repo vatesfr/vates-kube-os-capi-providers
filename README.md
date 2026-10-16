@@ -62,7 +62,7 @@ providers:
     url: file:///ABS/PATH/CAVP/main/dist/bootstrap-components.yaml
   - name: vates
     type: ControlPlaneProvider
-    url: file:///ABS/PATH/CAVP/main/dist/controlplane-components.yaml
+    url: file:///ABS/PATH/CAVP/main/dist/control-plane-components.yaml
   - name: vates
     type: InfrastructureProvider
     url: file:///ABS/PATH/CAPI/dist/infrastructure-components.yaml

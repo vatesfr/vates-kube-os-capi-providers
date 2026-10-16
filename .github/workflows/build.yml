@@ -1,0 +1,68 @@
+name: Build and Push Image
+
+# Builds the single image that carries both managers (CAVBP and CAVCPP) and
+# pushes it to ghcr.io on a release tag. On a pull request it builds without
+# pushing, so a broken Dockerfile is caught before the tag, and the image is
+# built from the module as pinned in go.mod (no local replace), which is what
+# makes this self-contained build meaningful.
+
+on:
+  pull_request:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            TAGS="ghcr.io/vatesfr/vates-kube-os-capi-providers:pr-${{ github.event.pull_request.number }}"
+          else
+            TAGS="ghcr.io/vatesfr/vates-kube-os-capi-providers:${GITHUB_REF_NAME}"
+            TAGS="$TAGS,ghcr.io/vatesfr/vates-kube-os-capi-providers:latest"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}

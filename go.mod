@@ -5,7 +5,7 @@ go 1.25.8
 require (
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
-	github.com/vatesfr/vates-kube-os v0.0.0
+	github.com/vatesfr/vates-kube-os v0.0.0-20261016094755-42adb6b22975
 	google.golang.org/grpc v1.80.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.4
@@ -106,7 +106,3 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
 )
-
-// The Vates Kube OS module owns the vates-node.yaml schema (vatescfg) both
-// providers import.
-replace github.com/vatesfr/vates-kube-os => ../../OS/main
