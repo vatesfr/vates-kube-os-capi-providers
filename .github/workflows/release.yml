@@ -1,0 +1,58 @@
+name: Release
+
+# Publishes the GitHub release for a tag: builds the two clusterctl artifacts
+# this repo ships (one per provider -- CAVBP and CAVCPP) plus metadata.yaml and
+# attaches them, with notes generated from .github/release.yml. The container
+# image itself is built and pushed by the "Build and Push Image" workflow, which
+# also runs on tag pushes.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    name: Run on Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+
+      # release-manifests needs controller-gen (CRDs, RBAC) and kustomize; the
+      # versions match the ones cluster-api-provider-vates pins, so the two
+      # providers render the same way.
+      - name: Install the manifest tools
+        run: |
+          set -euo pipefail
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.20.1
+          go install sigs.k8s.io/kustomize/kustomize/v5@v5.8.1
+
+      - name: Generate the clusterctl release assets
+        run: make release-manifests IMG=ghcr.io/vatesfr/vates-kube-os-capi-providers:${GITHUB_REF_NAME}
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          flags=()
+          # Pre-release tags (v0.1.0-rc1, -beta1, -alpha1) are published as prereleases.
+          case "$TAG" in *-*) flags+=(--prerelease) ;; esac
+
+          gh release create "$TAG" "${flags[@]}" --verify-tag --generate-notes \
+            dist/bootstrap-components.yaml \
+            dist/controlplane-components.yaml \
+            dist/metadata.yaml
