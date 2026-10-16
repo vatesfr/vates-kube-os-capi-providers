@@ -53,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            TAGS="ghcr.io/vatesfr/vates-kube-os-capi-providers:pr-${GITHUB_EVENT_NUMBER}"
+            TAGS="ghcr.io/vatesfr/vates-kube-os-capi-providers:pr-${{ github.event.pull_request.number }}"
           else
             TAGS="ghcr.io/vatesfr/vates-kube-os-capi-providers:${GITHUB_REF_NAME}"
             TAGS="$TAGS,ghcr.io/vatesfr/vates-kube-os-capi-providers:latest"
