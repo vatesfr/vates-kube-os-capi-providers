@@ -13,6 +13,14 @@ endif
 
 CONTAINER_TOOL ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 
+# The release image is built FROM scratch (see Dockerfile) and the dev image
+# (Dockerfile.dev) copies the binaries built here into a scratch image too: a
+# dynamically linked binary has no interpreter there and fails at exec with
+# "no such file or directory". Build static binaries everywhere, not only in
+# the container image.
+CGO_ENABLED ?= 0
+export CGO_ENABLED
+
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
@@ -58,7 +66,7 @@ test: manifests generate fmt vet ## Run tests.
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build both managers.
+build: manifests generate fmt vet ## Build both managers (static: they run in a scratch image).
 	go build -o bin/bootstrap-manager ./cmd/bootstrap
 	go build -o bin/controlplane-manager ./cmd/controlplane
 
@@ -73,6 +81,10 @@ run-controlplane: manifests generate fmt vet
 .PHONY: docker-build
 docker-build: ## Build the (single) image carrying both managers.
 	$(CONTAINER_TOOL) build -t ${IMG} .
+
+.PHONY: docker-build-dev
+docker-build-dev: build ## Build the dev image from the static binaries built on the host.
+	$(CONTAINER_TOOL) build -f Dockerfile.dev -t ${IMG} .
 
 .PHONY: docker-push
 docker-push:

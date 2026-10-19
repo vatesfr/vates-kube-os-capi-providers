@@ -99,10 +99,19 @@ Then use `url: file:///ABS/PATH/.../dist/bootstrap-components.yaml` (and
 ## Build
 
 ```bash
-make build    # bin/bootstrap-manager, bin/controlplane-manager
+make build    # bin/bootstrap-manager, bin/controlplane-manager (static)
 make test
 make manifests generate
+
+# the image: self-contained, from the pinned module (what the release workflow does)
+make docker-build IMG=ghcr.io/vatesfr/vates-kube-os-capi-providers:dev
+# or, while go.mod carries a local replace: build on the host, copy into scratch
+make docker-build-dev IMG=ghcr.io/vatesfr/vates-kube-os-capi-providers:dev
 ```
+
+`make build` sets `CGO_ENABLED=0`. Both images are `FROM scratch`, so a
+dynamically linked binary would fail at exec with `no such file or directory`:
+keep the binaries static.
 
 ## License
 
