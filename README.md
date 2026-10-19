@@ -16,7 +16,7 @@ module:
 
 | provider | CRDs | owns |
 |---|---|---|
-| **CAVBP** (bootstrap) | `VatesBootstrapConfig` (+ `Template`) | turns a Machine into the `vates-node.yaml` user-data the node reads at first boot (role, Kubernetes version, endpoint, node name, PKI, join material) |
+| **CAVBP** (bootstrap) | `VatesConfig` (+ `Template`) | turns a Machine into the `vates-node.yaml` user-data the node reads at first boot (role, Kubernetes version, endpoint, node name, PKI, join material) |
 | **CAVCPP** (control plane) | `VatesControlPlane` (+ `Template`) | the cluster certificate authority, and the control plane Machines |
 
 The infrastructure half lives in
@@ -26,7 +26,7 @@ The infrastructure half lives in
 ## Layout
 
 ```
-api/bootstrap/v1alpha1/       VatesBootstrapConfig types
+api/bootstrap/v1alpha1/       VatesConfig types
 api/controlplane/v1alpha1/    VatesControlPlane types
 internal/bootstrap/           the bootstrap reconciler + document builder + pki + management-API client
 internal/controlplane/        the control plane reconciler + cluster CA

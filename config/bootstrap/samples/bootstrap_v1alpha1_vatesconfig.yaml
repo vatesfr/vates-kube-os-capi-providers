@@ -1,7 +1,7 @@
 apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
-kind: VatesBootstrapConfig
+kind: VatesConfig
 metadata:
-  name: vatesbootstrapconfig-sample
+  name: vatesconfig-sample
 spec:
   # kubernetesVersion is optional: the owner Cluster's spec.topology.version is
   # used when it is empty.

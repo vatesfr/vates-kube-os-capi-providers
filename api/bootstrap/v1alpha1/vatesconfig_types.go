@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// VatesBootstrapConfigSpec is the desired configuration of a Vates Kube OS
+// VatesConfigSpec is the desired configuration of a Vates Kube OS
 // machine. It is the CAPI-facing shape of the vates-node.yaml document the node
 // reads at first boot: the provider fills in what it can derive from the owner
 // Cluster and Machine (role, Kubernetes version, control plane endpoint) and
@@ -30,7 +30,7 @@ import (
 // package stays the single source of truth for the semantics and the validation:
 // this spec is encoded into a vatescfg.Config and validated by it before a node
 // ever sees the document.
-type VatesBootstrapConfigSpec struct {
+type VatesConfigSpec struct {
 	// KubernetesVersion is the Kubernetes release to run, e.g. "v1.31.0".
 	// Optional: when empty the owner Cluster's spec.topology.version is used.
 	// +optional
@@ -245,11 +245,11 @@ type VatesTime struct {
 	Servers []string `json:"servers,omitempty"`
 }
 
-// VatesBootstrapConfigStatus is the state of the bootstrap, as observed by the
+// VatesConfigStatus is the state of the bootstrap, as observed by the
 // provider. The provider sets DataSecretName once the document is written; under
 // the Cluster API contract the Machine controller reads status.dataSecretName
 // and status.initialization.dataSecretCreated.
-type VatesBootstrapConfigStatus struct {
+type VatesConfigStatus struct {
 	// Ready is true once the bootstrap data Secret exists. Kept for the
 	// v1beta1 bootstrap contract; v1beta2 clients read Initialization instead.
 	// +optional
@@ -257,7 +257,7 @@ type VatesBootstrapConfigStatus struct {
 
 	// Initialization tracks whether the bootstrap data Secret has been created.
 	// +optional
-	Initialization *VatesBootstrapConfigInitialization `json:"initialization,omitempty"`
+	Initialization *VatesConfigInitialization `json:"initialization,omitempty"`
 
 	// DataSecretName is the name of the Secret that holds the bootstrap data.
 	// +optional
@@ -278,9 +278,9 @@ type VatesBootstrapConfigStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// VatesBootstrapConfigInitialization carries the initialization checkpoint of
+// VatesConfigInitialization carries the initialization checkpoint of
 // the Cluster API bootstrap contract.
-type VatesBootstrapConfigInitialization struct {
+type VatesConfigInitialization struct {
 	// DataSecretCreated is true when the bootstrap data Secret has been
 	// created. It is never unset once true.
 	// +optional
@@ -293,65 +293,65 @@ type VatesBootstrapConfigInitialization struct {
 // +kubebuilder:printcolumn:name="Ready",type="boolean",JSONPath=".status.ready"
 // +kubebuilder:printcolumn:name="DataSecret",type="string",JSONPath=".status.dataSecretName"
 
-// VatesBootstrapConfig is the Schema for the vatesbootstrapconfigs API. One
+// VatesConfig is the Schema for the vatesconfigs API. One
 // object is created per Machine, and the provider turns it into the
 // vates-node.yaml user-data the machine reads at first boot.
-type VatesBootstrapConfig struct {
+type VatesConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   VatesBootstrapConfigSpec   `json:"spec,omitempty"`
-	Status VatesBootstrapConfigStatus `json:"status,omitempty"`
+	Spec   VatesConfigSpec   `json:"spec,omitempty"`
+	Status VatesConfigStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// VatesBootstrapConfigList contains a list of VatesBootstrapConfig.
-type VatesBootstrapConfigList struct {
+// VatesConfigList contains a list of VatesConfig.
+type VatesConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []VatesBootstrapConfig `json:"items"`
+	Items           []VatesConfig `json:"items"`
 }
 
-// VatesBootstrapConfigTemplateSpec is the desired state of a
-// VatesBootstrapConfigTemplate.
-type VatesBootstrapConfigTemplateSpec struct {
-	// Template is the template that describes the VatesBootstrapConfig created
+// VatesConfigTemplateSpec is the desired state of a
+// VatesConfigTemplate.
+type VatesConfigTemplateSpec struct {
+	// Template is the template that describes the VatesConfig created
 	// from it.
-	Template VatesBootstrapConfigTemplateResource `json:"template"`
+	Template VatesConfigTemplateResource `json:"template"`
 }
 
-// VatesBootstrapConfigTemplateResource is the resource created from a
-// VatesBootstrapConfigTemplate.
-type VatesBootstrapConfigTemplateResource struct {
-	// Spec is the spec of the VatesBootstrapConfig created from this template.
-	Spec VatesBootstrapConfigSpec `json:"spec"`
+// VatesConfigTemplateResource is the resource created from a
+// VatesConfigTemplate.
+type VatesConfigTemplateResource struct {
+	// Spec is the spec of the VatesConfig created from this template.
+	Spec VatesConfigSpec `json:"spec"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=vbct,categories=cluster-api
 
-// VatesBootstrapConfigTemplate is the Schema for the
-// vatesbootstrapconfigtemplates API. It exists so a MachineDeployment or a
-// ClusterClass can stamp out per-machine VatesBootstrapConfigs.
-type VatesBootstrapConfigTemplate struct {
+// VatesConfigTemplate is the Schema for the
+// vatesconfigtemplates API. It exists so a MachineDeployment or a
+// ClusterClass can stamp out per-machine VatesConfigs.
+type VatesConfigTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec VatesBootstrapConfigTemplateSpec `json:"spec,omitempty"`
+	Spec VatesConfigTemplateSpec `json:"spec,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// VatesBootstrapConfigTemplateList contains a list of
-// VatesBootstrapConfigTemplate.
-type VatesBootstrapConfigTemplateList struct {
+// VatesConfigTemplateList contains a list of
+// VatesConfigTemplate.
+type VatesConfigTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []VatesBootstrapConfigTemplate `json:"items"`
+	Items           []VatesConfigTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&VatesBootstrapConfig{}, &VatesBootstrapConfigList{})
-	SchemeBuilder.Register(&VatesBootstrapConfigTemplate{}, &VatesBootstrapConfigTemplateList{})
+	SchemeBuilder.Register(&VatesConfig{}, &VatesConfigList{})
+	SchemeBuilder.Register(&VatesConfigTemplate{}, &VatesConfigTemplateList{})
 }

@@ -2,8 +2,8 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/bootstrap.cluster.x-k8s.io_vatesbootstrapconfigs.yaml
-- bases/bootstrap.cluster.x-k8s.io_vatesbootstrapconfigtemplates.yaml
+- bases/bootstrap.cluster.x-k8s.io_vatesconfigs.yaml
+- bases/bootstrap.cluster.x-k8s.io_vatesconfigtemplates.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 labels:

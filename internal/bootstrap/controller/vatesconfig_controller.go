@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package controller reconciles VatesBootstrapConfig objects into the bootstrap
+// Package controller reconciles VatesConfig objects into the bootstrap
 // data Secret a Vates Kube OS machine reads at first boot.
 package controller
 
@@ -57,27 +57,27 @@ const ReadyCondition = clusterv1.ReadyCondition
 // the bootstrap provider does not guess.
 const bootstrapAnnotation = "vates.io/bootstrap"
 
-// VatesBootstrapConfigReconciler reconciles a VatesBootstrapConfig object.
-type VatesBootstrapConfigReconciler struct {
+// VatesConfigReconciler reconciles a VatesConfig object.
+type VatesConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesbootstrapconfigs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesbootstrapconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesbootstrapconfigs/finalizers,verbs=update
-// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesbootstrapconfigtemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesconfigtemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;clusters,verbs=get;list;watch
 
-// Reconcile turns a VatesBootstrapConfig into the vates-node.yaml user-data
+// Reconcile turns a VatesConfig into the vates-node.yaml user-data
 // document, published as a Secret the infrastructure provider attaches to the
 // machine's config drive.
-func (r *VatesBootstrapConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ret ctrl.Result, rerr error) {
+func (r *VatesConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ret ctrl.Result, rerr error) {
 	logger := log.FromContext(ctx)
 
-	cfg := &bootstrapv1.VatesBootstrapConfig{}
+	cfg := &bootstrapv1.VatesConfig{}
 	if err := r.Get(ctx, req.NamespacedName, cfg); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -112,7 +112,7 @@ func (r *VatesBootstrapConfigReconciler) Reconcile(ctx context.Context, req ctrl
 		return ctrl.Result{}, err
 	}
 	if machine == nil {
-		logger.Info("VatesBootstrapConfig has no owner Machine yet; waiting")
+		logger.Info("VatesConfig has no owner Machine yet; waiting")
 		return ctrl.Result{}, nil
 	}
 
@@ -214,7 +214,7 @@ func (r *VatesBootstrapConfigReconciler) Reconcile(ctx context.Context, req ctrl
 
 	cfg.Status.Ready = true
 	cfg.Status.DataSecretName = ptr.To(secret.Name)
-	cfg.Status.Initialization = &bootstrapv1.VatesBootstrapConfigInitialization{DataSecretCreated: ptr.To(true)}
+	cfg.Status.Initialization = &bootstrapv1.VatesConfigInitialization{DataSecretCreated: ptr.To(true)}
 	cfg.Status.FailureReason = nil
 	cfg.Status.FailureMessage = nil
 	setReady(cfg, metav1.ConditionTrue, "DataSecretAvailable", "Bootstrap data Secret is available")
@@ -226,7 +226,7 @@ func (r *VatesBootstrapConfigReconciler) Reconcile(ctx context.Context, req ctrl
 // reconcileDataSecret creates or updates the Secret that carries the document.
 // The Secret is named after the config and owned by it, which is the shape the
 // Cluster API bootstrap contract and clusterctl expect.
-func (r *VatesBootstrapConfigReconciler) reconcileDataSecret(ctx context.Context, cfg *bootstrapv1.VatesBootstrapConfig, cluster *clusterv1.Cluster, data []byte) (*corev1.Secret, error) {
+func (r *VatesConfigReconciler) reconcileDataSecret(ctx context.Context, cfg *bootstrapv1.VatesConfig, cluster *clusterv1.Cluster, data []byte) (*corev1.Secret, error) {
 	key := types.NamespacedName{Namespace: cfg.Namespace, Name: cfg.Name}
 
 	secret := &corev1.Secret{}
@@ -253,9 +253,9 @@ func (r *VatesBootstrapConfigReconciler) reconcileDataSecret(ctx context.Context
 	return secret, nil
 }
 
-// desiredSecret is the Secret a VatesBootstrapConfig publishes: the document
+// desiredSecret is the Secret a VatesConfig publishes: the document
 // under the "value" key, labelled with the cluster and controlled by the config.
-func desiredSecret(cfg *bootstrapv1.VatesBootstrapConfig, cluster *clusterv1.Cluster, data []byte) *corev1.Secret {
+func desiredSecret(cfg *bootstrapv1.VatesConfig, cluster *clusterv1.Cluster, data []byte) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cfg.Name,
@@ -264,7 +264,7 @@ func desiredSecret(cfg *bootstrapv1.VatesBootstrapConfig, cluster *clusterv1.Clu
 				clusterv1.ClusterNameLabel: cluster.Name,
 			},
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(cfg, bootstrapv1.GroupVersion.WithKind("VatesBootstrapConfig")),
+				*metav1.NewControllerRef(cfg, bootstrapv1.GroupVersion.WithKind("VatesConfig")),
 			},
 		},
 		Type: clusterv1.ClusterSecretType,
@@ -275,7 +275,7 @@ func desiredSecret(cfg *bootstrapv1.VatesBootstrapConfig, cluster *clusterv1.Clu
 // ensureOperatorCA returns the cluster's operator CA, generating and storing it
 // the first time. It lives in a Secret named <cluster>-api-ca, owned by the
 // Cluster, so it survives any single control plane.
-func (r *VatesBootstrapConfigReconciler) ensureOperatorCA(ctx context.Context, cluster *clusterv1.Cluster) (*pki.OperatorCA, error) {
+func (r *VatesConfigReconciler) ensureOperatorCA(ctx context.Context, cluster *clusterv1.Cluster) (*pki.OperatorCA, error) {
 	name := cluster.Name + "-api-ca"
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: name}
 
@@ -328,7 +328,7 @@ const clusterCASecretSuffix = "-ca"
 // When the Secret is absent no CAPI control plane provider owns a CA: the
 // bootstrapping node generates one itself and joining machines fetch it from a
 // live control plane, which is the fallback path.
-func (r *VatesBootstrapConfigReconciler) injectOwnedClusterCA(ctx context.Context, cluster *clusterv1.Cluster, out *vatescfg.Config, bootstrap bool) (bool, error) {
+func (r *VatesConfigReconciler) injectOwnedClusterCA(ctx context.Context, cluster *clusterv1.Cluster, out *vatescfg.Config, bootstrap bool) (bool, error) {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name + clusterCASecretSuffix}
 	secret := &corev1.Secret{}
 	if err := r.Get(ctx, key, secret); err != nil {
@@ -374,7 +374,7 @@ func ownsControlPlane(cluster *clusterv1.Cluster) bool {
 // liveControlPlaneAddress finds a control plane Machine that already has an
 // address, so the provider can ask it for join material. self is skipped: a
 // machine cannot join itself.
-func (r *VatesBootstrapConfigReconciler) liveControlPlaneAddress(ctx context.Context, cluster *clusterv1.Cluster, self string, port int) (string, bool, error) {
+func (r *VatesConfigReconciler) liveControlPlaneAddress(ctx context.Context, cluster *clusterv1.Cluster, self string, port int) (string, bool, error) {
 	machines := &clusterv1.MachineList{}
 	if err := r.List(ctx, machines, client.InNamespace(cluster.Namespace), client.MatchingLabels{clusterv1.ClusterNameLabel: cluster.Name}); err != nil {
 		return "", false, err
@@ -400,7 +400,7 @@ func (r *VatesBootstrapConfigReconciler) liveControlPlaneAddress(ctx context.Con
 // fresh join credentials, stores the kubeconfig where clusterctl and the addon
 // ClusterResourceSets read it, and fills the document with what a joining
 // machine needs.
-func (r *VatesBootstrapConfigReconciler) fillJoinMaterial(ctx context.Context, cluster *clusterv1.Cluster, out *vatescfg.Config, ca *pki.OperatorCA, addr string) error {
+func (r *VatesConfigReconciler) fillJoinMaterial(ctx context.Context, cluster *clusterv1.Cluster, out *vatescfg.Config, ca *pki.OperatorCA, addr string) error {
 	cl, err := vatesapi.Dial(addr, ca)
 	if err != nil {
 		return err
@@ -479,7 +479,7 @@ const joinCallTimeout = 2 * time.Minute
 //
 // fetch asks a live control plane for fresh material; it is a parameter rather
 // than a call on a client so the caching rules below can be tested without one.
-func (r *VatesBootstrapConfigReconciler) cachedJoinMaterial(ctx context.Context, cluster *clusterv1.Cluster, fetch func(context.Context) (vatesapi.JoinMaterial, error)) (vatesapi.JoinMaterial, error) {
+func (r *VatesConfigReconciler) cachedJoinMaterial(ctx context.Context, cluster *clusterv1.Cluster, fetch func(context.Context) (vatesapi.JoinMaterial, error)) (vatesapi.JoinMaterial, error) {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name + "-join-material"}
 
 	secret := &corev1.Secret{}
@@ -563,7 +563,7 @@ func joinMaterialFromSecret(secret *corev1.Secret) vatesapi.JoinMaterial {
 // ensureKubeconfigSecret publishes the workload cluster kubeconfig under
 // <cluster>-kubeconfig, the name Cluster API and its addon ClusterResourceSets
 // read. It is fetched once and kept fresh.
-func (r *VatesBootstrapConfigReconciler) ensureKubeconfigSecret(ctx context.Context, cluster *clusterv1.Cluster, kubeconfig []byte) error {
+func (r *VatesConfigReconciler) ensureKubeconfigSecret(ctx context.Context, cluster *clusterv1.Cluster, kubeconfig []byte) error {
 	name := cluster.Name + "-kubeconfig"
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: name}
 
@@ -597,13 +597,13 @@ func (r *VatesBootstrapConfigReconciler) ensureKubeconfigSecret(ctx context.Cont
 	return nil
 }
 
-func (r *VatesBootstrapConfigReconciler) markFailed(cfg *bootstrapv1.VatesBootstrapConfig, reason, message string) {
+func (r *VatesConfigReconciler) markFailed(cfg *bootstrapv1.VatesConfig, reason, message string) {
 	cfg.Status.FailureReason = ptr.To(reason)
 	cfg.Status.FailureMessage = ptr.To(message)
 	setReady(cfg, metav1.ConditionFalse, reason, message)
 }
 
-func setReady(cfg *bootstrapv1.VatesBootstrapConfig, status metav1.ConditionStatus, reason, message string) {
+func setReady(cfg *bootstrapv1.VatesConfig, status metav1.ConditionStatus, reason, message string) {
 	apimeta.SetStatusCondition(&cfg.Status.Conditions, metav1.Condition{
 		Type:               ReadyCondition,
 		Status:             status,
@@ -614,10 +614,10 @@ func setReady(cfg *bootstrapv1.VatesBootstrapConfig, status metav1.ConditionStat
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *VatesBootstrapConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *VatesConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&bootstrapv1.VatesBootstrapConfig{}).
+		For(&bootstrapv1.VatesConfig{}).
 		Owns(&corev1.Secret{}).
-		Named("vatesbootstrapconfig").
+		Named("vatesconfig").
 		Complete(r)
 }

@@ -106,7 +106,7 @@ func TestCachedJoinMaterial(t *testing.T) {
 				}, nil
 			}
 
-			r := &VatesBootstrapConfigReconciler{Client: c, Scheme: scheme}
+			r := &VatesConfigReconciler{Client: c, Scheme: scheme}
 			got, err := r.cachedJoinMaterial(context.Background(), cluster, fetch)
 
 			switch {

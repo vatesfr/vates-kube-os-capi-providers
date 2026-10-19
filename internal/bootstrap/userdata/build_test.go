@@ -68,7 +68,7 @@ func validCNI() bootstrapv1.VatesCNI {
 func TestBuild(t *testing.T) {
 	tests := []struct {
 		name        string
-		config      *bootstrapv1.VatesBootstrapConfig
+		config      *bootstrapv1.VatesConfig
 		cluster     *clusterv1.Cluster
 		machine     *clusterv1.Machine
 		wantErr     string
@@ -78,8 +78,8 @@ func TestBuild(t *testing.T) {
 	}{
 		{
 			name: "control plane derives role, version and endpoint from the CAPI objects",
-			config: &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{Network: validNetwork(), CNI: validCNI()},
+			config: &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{Network: validNetwork(), CNI: validCNI()},
 			},
 			cluster:     clusterWith("v1.31.4", "10.0.0.10", 6443),
 			machine:     machineWithLabels(map[string]string{clusterv1.MachineControlPlaneLabel: ""}),
@@ -89,8 +89,8 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name: "worker is a machine without the control plane label",
-			config: &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+			config: &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{
 					Network: validNetwork(),
 					CNI:     validCNI(),
 					Cluster: bootstrapv1.VatesCluster{Token: "abcdef.0123456789abcdef"},
@@ -104,8 +104,8 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name: "explicit kubernetes version overrides the cluster topology version",
-			config: &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+			config: &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{
 					KubernetesVersion: "v1.32.1",
 					Network:           validNetwork(),
 					CNI:               validCNI(),
@@ -119,8 +119,8 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name: "explicit control plane endpoint overrides the cluster endpoint",
-			config: &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+			config: &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{
 					Network: validNetwork(),
 					CNI:     validCNI(),
 					Cluster: bootstrapv1.VatesCluster{ControlPlaneEndpoint: "192.168.1.5:6443"},
@@ -134,8 +134,8 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name: "join material is carried through for a joining control plane",
-			config: &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+			config: &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{
 					Network: validNetwork(),
 					CNI:     validCNI(),
 					Cluster: bootstrapv1.VatesCluster{
@@ -153,8 +153,8 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name: "no version anywhere is refused",
-			config: &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{Network: validNetwork(), CNI: validCNI()},
+			config: &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{Network: validNetwork(), CNI: validCNI()},
 			},
 			cluster: clusterWith("", "10.0.0.10", 6443),
 			machine: machineWithLabels(map[string]string{clusterv1.MachineControlPlaneLabel: ""}),
@@ -162,8 +162,8 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name: "a worker without a token is refused",
-			config: &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{Network: validNetwork(), CNI: validCNI()},
+			config: &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{Network: validNetwork(), CNI: validCNI()},
 			},
 			cluster: clusterWith("v1.31.4", "10.0.0.10", 6443),
 			machine: machineWithLabels(nil),
@@ -171,8 +171,8 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name: "a missing network interface is refused",
-			config: &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+			config: &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{
 					Network: bootstrapv1.VatesNetwork{Mode: "dhcp"},
 					CNI:     validCNI(),
 				},
@@ -183,7 +183,7 @@ func TestBuild(t *testing.T) {
 		},
 		{
 			name:        "a missing cluster is refused",
-			config:      &bootstrapv1.VatesBootstrapConfig{Spec: bootstrapv1.VatesBootstrapConfigSpec{Network: validNetwork(), CNI: validCNI()}},
+			config:      &bootstrapv1.VatesConfig{Spec: bootstrapv1.VatesConfigSpec{Network: validNetwork(), CNI: validCNI()}},
 			cluster:     nil,
 			machine:     machineWithLabels(map[string]string{clusterv1.MachineControlPlaneLabel: ""}),
 			wantErr:     "owner Cluster is required",
@@ -228,13 +228,13 @@ func TestBuild(t *testing.T) {
 func TestUserDataRoundTripsThroughTheOSSchema(t *testing.T) {
 	tests := []struct {
 		name   string
-		config *bootstrapv1.VatesBootstrapConfig
+		config *bootstrapv1.VatesConfig
 		check  func(t *testing.T, got *vatescfg.Config)
 	}{
 		{
 			name: "optional blocks are carried into the document",
-			config: &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+			config: &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{
 					Network: validNetwork(),
 					CNI:     validCNI(),
 					Cluster: bootstrapv1.VatesCluster{
@@ -333,8 +333,8 @@ func TestUserDataCarriesTheCNIPluginThroughTheOSSchema(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			config := &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+			config := &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{
 					Network: validNetwork(),
 					CNI:     bootstrapv1.VatesCNI{Plugin: tt.plugin, CIDR: "10.244.0.0/16"},
 				},
@@ -382,8 +382,8 @@ func TestProxyDisabledIsRefusedUnlessTheCNIIsNone(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			config := &bootstrapv1.VatesBootstrapConfig{
-				Spec: bootstrapv1.VatesBootstrapConfigSpec{
+			config := &bootstrapv1.VatesConfig{
+				Spec: bootstrapv1.VatesConfigSpec{
 					Network: validNetwork(),
 					CNI:     bootstrapv1.VatesCNI{Plugin: tt.plugin, CIDR: "10.244.0.0/16"},
 					Cluster: bootstrapv1.VatesCluster{Proxy: &bootstrapv1.VatesProxy{Disabled: true}},
