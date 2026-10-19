@@ -26,7 +26,7 @@ rules:
 - apiGroups:
   - bootstrap.cluster.x-k8s.io
   resources:
-  - vatesbootstrapconfigs
+  - vatesconfigs
   verbs:
   - create
   - delete
@@ -38,13 +38,13 @@ rules:
 - apiGroups:
   - bootstrap.cluster.x-k8s.io
   resources:
-  - vatesbootstrapconfigs/finalizers
+  - vatesconfigs/finalizers
   verbs:
   - update
 - apiGroups:
   - bootstrap.cluster.x-k8s.io
   resources:
-  - vatesbootstrapconfigs/status
+  - vatesconfigs/status
   verbs:
   - get
   - patch
@@ -52,7 +52,7 @@ rules:
 - apiGroups:
   - bootstrap.cluster.x-k8s.io
   resources:
-  - vatesbootstrapconfigtemplates
+  - vatesconfigtemplates
   verbs:
   - get
   - list

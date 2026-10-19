@@ -2,6 +2,12 @@
 # replace resolves) and copied into a scratch image. See the repo Dockerfile for
 # the self-contained build.
 #
+#   make docker-build-dev IMG=<img>   # runs make build, then this file
+#
+# Building by hand is equivalent, but the binaries must be static: this image is
+# FROM scratch, so a dynamically linked binary fails at exec with "no such file
+# or directory". CGO_ENABLED=0 is what the Makefile sets.
+#
 #   CGO_ENABLED=0 go build -o bin/bootstrap-manager ./cmd/bootstrap
 #   CGO_ENABLED=0 go build -o bin/controlplane-manager ./cmd/controlplane
 #   podman build -f Dockerfile.dev -t <img> .

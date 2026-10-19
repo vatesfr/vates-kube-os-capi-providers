@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package userdata turns a VatesBootstrapConfig plus its owner Cluster and
+// Package userdata turns a VatesConfig plus its owner Cluster and
 // Machine into the vates-node.yaml user-data document a Vates Kube OS node
 // reads at first boot.
 //
@@ -22,7 +22,7 @@ limitations under the License.
 // schema package the OS itself decodes, so the provider cannot emit a document
 // the node would reject. Everything the provider can derive from the CAPI
 // objects (the role, the Kubernetes version, the control plane endpoint) is
-// derived; the rest comes from the VatesBootstrapConfig.
+// derived; the rest comes from the VatesConfig.
 package userdata
 
 import (
@@ -39,9 +39,9 @@ import (
 // caller fills in what only it can know -- the PKI, and the join material a
 // joining machine fetches from a live control plane -- before encoding, which is
 // where Validate runs. Use Build when nothing more will be added.
-func Assemble(cfg *bootstrapv1.VatesBootstrapConfig, cluster *clusterv1.Cluster, machine *clusterv1.Machine) (*vatescfg.Config, error) {
+func Assemble(cfg *bootstrapv1.VatesConfig, cluster *clusterv1.Cluster, machine *clusterv1.Machine) (*vatescfg.Config, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("VatesBootstrapConfig is required")
+		return nil, fmt.Errorf("VatesConfig is required")
 	}
 	if cluster == nil {
 		return nil, fmt.Errorf("owner Cluster is required")
@@ -111,7 +111,7 @@ func Assemble(cfg *bootstrapv1.VatesBootstrapConfig, cluster *clusterv1.Cluster,
 // Build is Assemble followed by validation. It is the entry point for a document
 // that is complete as built; a caller that still has to add the PKI or join
 // material uses Assemble and lets the encode validate.
-func Build(cfg *bootstrapv1.VatesBootstrapConfig, cluster *clusterv1.Cluster, machine *clusterv1.Machine) (*vatescfg.Config, error) {
+func Build(cfg *bootstrapv1.VatesConfig, cluster *clusterv1.Cluster, machine *clusterv1.Machine) (*vatescfg.Config, error) {
 	out, err := Assemble(cfg, cluster, machine)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func Build(cfg *bootstrapv1.VatesBootstrapConfig, cluster *clusterv1.Cluster, ma
 }
 
 // UserData is Build followed by encoding the document as the user-data payload.
-func UserData(cfg *bootstrapv1.VatesBootstrapConfig, cluster *clusterv1.Cluster, machine *clusterv1.Machine) ([]byte, error) {
+func UserData(cfg *bootstrapv1.VatesConfig, cluster *clusterv1.Cluster, machine *clusterv1.Machine) ([]byte, error) {
 	out, err := Build(cfg, cluster, machine)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func Role(machine *clusterv1.Machine) vatescfg.Role {
 // version -- which the CAPI control plane provider sets from its own spec -- and
 // finally the owner Cluster's topology version. It deliberately does not
 // default: an empty version is a document nothing can run, and Validate names it.
-func kubernetesVersion(spec bootstrapv1.VatesBootstrapConfigSpec, machine *clusterv1.Machine, cluster *clusterv1.Cluster) string {
+func kubernetesVersion(spec bootstrapv1.VatesConfigSpec, machine *clusterv1.Machine, cluster *clusterv1.Cluster) string {
 	if spec.KubernetesVersion != "" {
 		return spec.KubernetesVersion
 	}
@@ -162,7 +162,7 @@ func kubernetesVersion(spec bootstrapv1.VatesBootstrapConfigSpec, machine *clust
 
 // controlPlaneEndpoint is the spec override when set, otherwise the owner
 // Cluster's endpoint as host:port.
-func controlPlaneEndpoint(spec bootstrapv1.VatesBootstrapConfigSpec, cluster *clusterv1.Cluster) string {
+func controlPlaneEndpoint(spec bootstrapv1.VatesConfigSpec, cluster *clusterv1.Cluster) string {
 	if spec.Cluster.ControlPlaneEndpoint != "" {
 		return spec.Cluster.ControlPlaneEndpoint
 	}

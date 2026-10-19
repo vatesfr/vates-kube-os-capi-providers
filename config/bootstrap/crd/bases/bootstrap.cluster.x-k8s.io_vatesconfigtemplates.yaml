@@ -6,27 +6,27 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.21.0
   labels:
     cluster.x-k8s.io/v1beta2: v1alpha1
-  name: vatesbootstrapconfigtemplates.bootstrap.cluster.x-k8s.io
+  name: vatesconfigtemplates.bootstrap.cluster.x-k8s.io
 spec:
   group: bootstrap.cluster.x-k8s.io
   names:
     categories:
     - cluster-api
-    kind: VatesBootstrapConfigTemplate
-    listKind: VatesBootstrapConfigTemplateList
-    plural: vatesbootstrapconfigtemplates
+    kind: VatesConfigTemplate
+    listKind: VatesConfigTemplateList
+    plural: vatesconfigtemplates
     shortNames:
     - vbct
-    singular: vatesbootstrapconfigtemplate
+    singular: vatesconfigtemplate
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: |-
-          VatesBootstrapConfigTemplate is the Schema for the
-          vatesbootstrapconfigtemplates API. It exists so a MachineDeployment or a
-          ClusterClass can stamp out per-machine VatesBootstrapConfigs.
+          VatesConfigTemplate is the Schema for the
+          vatesconfigtemplates API. It exists so a MachineDeployment or a
+          ClusterClass can stamp out per-machine VatesConfigs.
         properties:
           apiVersion:
             description: |-
@@ -47,17 +47,17 @@ spec:
             type: object
           spec:
             description: |-
-              VatesBootstrapConfigTemplateSpec is the desired state of a
-              VatesBootstrapConfigTemplate.
+              VatesConfigTemplateSpec is the desired state of a
+              VatesConfigTemplate.
             properties:
               template:
                 description: |-
-                  Template is the template that describes the VatesBootstrapConfig created
+                  Template is the template that describes the VatesConfig created
                   from it.
                 properties:
                   spec:
-                    description: Spec is the spec of the VatesBootstrapConfig created
-                      from this template.
+                    description: Spec is the spec of the VatesConfig created from
+                      this template.
                     properties:
                       api:
                         description: API configures the node's management API.

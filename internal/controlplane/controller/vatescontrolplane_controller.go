@@ -80,8 +80,8 @@ type VatesControlPlaneReconciler struct {
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=vates.infrastructure.cluster.x-k8s.io,resources=xomachines,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=vates.infrastructure.cluster.x-k8s.io,resources=xomachinetemplates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesbootstrapconfigs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesbootstrapconfigtemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=vatesconfigtemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 
 // Reconcile turns a VatesControlPlane into a running control plane: it ensures
@@ -421,7 +421,7 @@ func machineIndex(controlPlaneName, machineName string) (int, bool) {
 }
 
 // createControlPlaneMachine creates one control plane Machine and the two
-// objects it references: a VatesBootstrapConfig stamped from the bootstrap
+// objects it references: a VatesConfig stamped from the bootstrap
 // template, and an XOMachine stamped from the infrastructure template.
 func (r *VatesControlPlaneReconciler) createControlPlaneMachine(ctx context.Context, vcp *controlplanev1alpha1.VatesControlPlane, cluster *clusterv1.Cluster, index int) error {
 	name := fmt.Sprintf("%s-%d", vcp.Name, index)
@@ -440,7 +440,7 @@ func (r *VatesControlPlaneReconciler) createControlPlaneMachine(ctx context.Cont
 		annotations[BootstrapAnnotation] = "false"
 	}
 
-	// The bootstrap document: a VatesBootstrapConfig cloned from the declared
+	// The bootstrap document: a VatesConfig cloned from the declared
 	// template. The template carries the cluster-independent document; the
 	// bootstrap provider adds the role, the CA and the join material.
 	bootstrapRef := vcp.Spec.MachineTemplate.BootstrapConfigTemplateRef.DeepCopy()

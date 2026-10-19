@@ -16,7 +16,7 @@ module:
 
 | provider | CRDs | owns |
 |---|---|---|
-| **CAVBP** (bootstrap) | `VatesBootstrapConfig` (+ `Template`) | turns a Machine into the `vates-node.yaml` user-data the node reads at first boot (role, Kubernetes version, endpoint, node name, PKI, join material) |
+| **CAVBP** (bootstrap) | `VatesConfig` (+ `Template`) | turns a Machine into the `vates-node.yaml` user-data the node reads at first boot (role, Kubernetes version, endpoint, node name, PKI, join material) |
 | **CAVCPP** (control plane) | `VatesControlPlane` (+ `Template`) | the cluster certificate authority, and the control plane Machines |
 
 The infrastructure half lives in
@@ -26,7 +26,7 @@ The infrastructure half lives in
 ## Layout
 
 ```
-api/bootstrap/v1alpha1/       VatesBootstrapConfig types
+api/bootstrap/v1alpha1/       VatesConfig types
 api/controlplane/v1alpha1/    VatesControlPlane types
 internal/bootstrap/           the bootstrap reconciler + document builder + pki + management-API client
 internal/controlplane/        the control plane reconciler + cluster CA
@@ -99,10 +99,19 @@ Then use `url: file:///ABS/PATH/.../dist/bootstrap-components.yaml` (and
 ## Build
 
 ```bash
-make build    # bin/bootstrap-manager, bin/controlplane-manager
+make build    # bin/bootstrap-manager, bin/controlplane-manager (static)
 make test
 make manifests generate
+
+# the image: self-contained, from the pinned module (what the release workflow does)
+make docker-build IMG=ghcr.io/vatesfr/vates-kube-os-capi-providers:dev
+# or, while go.mod carries a local replace: build on the host, copy into scratch
+make docker-build-dev IMG=ghcr.io/vatesfr/vates-kube-os-capi-providers:dev
 ```
+
+`make build` sets `CGO_ENABLED=0`. Both images are `FROM scratch`, so a
+dynamically linked binary would fail at exec with `no such file or directory`:
+keep the binaries static.
 
 ## License
 

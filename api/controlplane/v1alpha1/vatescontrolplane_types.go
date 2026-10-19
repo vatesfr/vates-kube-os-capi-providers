@@ -55,7 +55,7 @@ type VatesControlPlaneMachineTemplate struct {
 	// +required
 	InfrastructureRef corev1.ObjectReference `json:"infrastructureRef"`
 
-	// BootstrapConfigTemplateRef is the VatesBootstrapConfigTemplate the
+	// BootstrapConfigTemplateRef is the VatesConfigTemplate the
 	// bootstrap document is stamped from. The provider adds the cluster CA to
 	// the document it produces.
 	// +required

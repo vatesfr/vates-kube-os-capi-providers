@@ -72,7 +72,7 @@ func main() {
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&namespace, "namespace", "",
-		"Namespace to watch for VatesBootstrapConfig and Secret objects. If empty, all namespaces are watched.")
+		"Namespace to watch for VatesConfig and Secret objects. If empty, all namespaces are watched.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -118,11 +118,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.VatesBootstrapConfigReconciler{
+	if err := (&controller.VatesConfigReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "VatesBootstrapConfig")
+		setupLog.Error(err, "Failed to create controller", "controller", "VatesConfig")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

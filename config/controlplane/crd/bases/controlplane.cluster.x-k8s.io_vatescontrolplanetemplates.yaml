@@ -79,7 +79,7 @@ spec:
                         properties:
                           bootstrapConfigTemplateRef:
                             description: |-
-                              BootstrapConfigTemplateRef is the VatesBootstrapConfigTemplate the
+                              BootstrapConfigTemplateRef is the VatesConfigTemplate the
                               bootstrap document is stamped from. The provider adds the cluster CA to
                               the document it produces.
                             properties:

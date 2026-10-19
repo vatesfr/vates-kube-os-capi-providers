@@ -15,7 +15,7 @@ resources:
   controller: true
   domain: cluster.x-k8s.io
   group: bootstrap
-  kind: VatesBootstrapConfig
+  kind: VatesConfig
   path: github.com/vatesfr/vates-kube-os-capi-providers/api/bootstrap/v1alpha1
   version: v1alpha1
 - api:
@@ -23,7 +23,7 @@ resources:
     namespaced: true
   domain: cluster.x-k8s.io
   group: bootstrap
-  kind: VatesBootstrapConfigTemplate
+  kind: VatesConfigTemplate
   path: github.com/vatesfr/vates-kube-os-capi-providers/api/bootstrap/v1alpha1
   version: v1alpha1
 - api:
