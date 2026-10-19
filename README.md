@@ -70,8 +70,8 @@ providers:
 
 ```bash
 clusterctl init \
-  --bootstrap      vates:v0.1.0 \
-  --control-plane  vates:v0.1.0 \
+  --bootstrap      vates:v0.2.0 \
+  --control-plane  vates:v0.2.0 \
   --infrastructure vates:<version>
 ```
 
@@ -85,10 +85,10 @@ To install artifacts that are not released yet, build them and point the URLs
 at the files instead:
 
 ```bash
-make release-manifests IMG=ghcr.io/vatesfr/vates-kube-os-capi-providers:v0.1.0
+make release-manifests IMG=ghcr.io/vatesfr/vates-kube-os-capi-providers:v0.2.0
 # clusterctl reads each provider's metadata from its own override directory:
 for t in bootstrap control-plane; do
-  d=~/.config/cluster-api/overrides/$t-vates/v0.1.0
+  d=~/.config/cluster-api/overrides/$t-vates/v0.2.0
   mkdir -p "$d" && cp dist/metadata.yaml "$d/"
 done
 ```
