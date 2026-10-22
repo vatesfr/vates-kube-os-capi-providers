@@ -21,6 +21,65 @@ func machines(indices ...int) map[int]clusterv1.Machine {
 	return out
 }
 
+func TestMachineName(t *testing.T) {
+	for _, index := range []int{0, 1, 12} {
+		name := machineName(index)
+		prefix := fmt.Sprintf("vates-%d-", index)
+		if len(name) != len(prefix)+5 {
+			t.Errorf("machineName(%d) = %q, want %d characters", index, name, len(prefix)+5)
+		}
+		if len(name) > 63 {
+			t.Errorf("machineName(%d) = %q, longer than 63 characters", index, name)
+		}
+		for _, r := range name[len(prefix):] {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') {
+				t.Errorf("machineName(%d) = %q, suffix is not lowercase alphanumeric", index, name)
+			}
+		}
+	}
+
+	if a, b := machineName(0), machineName(0); a == b {
+		t.Errorf("machineName generated the same name twice: %q", a)
+	}
+}
+
+func TestMachineIndex(t *testing.T) {
+	tests := []struct {
+		controlPlane string
+		machine      string
+		want         int
+		wantOK       bool
+	}{
+		{controlPlane: "cp", machine: "cp-0", want: 0, wantOK: true},
+		{controlPlane: "cp", machine: "cp-12", want: 12, wantOK: true},
+		{controlPlane: "cp", machine: "vates-0-7n62g", want: 0, wantOK: true},
+		{controlPlane: "cp", machine: "vates-12-abc12", want: 12, wantOK: true},
+		{controlPlane: "my-cluster", machine: "vates-0-abc12", want: 0, wantOK: true},
+		{controlPlane: "cp", machine: "cp-0-7n62g", want: 0, wantOK: true},
+		{controlPlane: "cp", machine: "cp-12-abc12", want: 12, wantOK: true},
+		{controlPlane: "my-cluster", machine: "my-cluster-0-abc12", want: 0, wantOK: true},
+		{controlPlane: "my-cluster", machine: "my-cluster-0", want: 0, wantOK: true},
+		{controlPlane: "cp", machine: "cp", wantOK: false},
+		{controlPlane: "cp", machine: "cp-", wantOK: false},
+		{controlPlane: "cp", machine: "cp-x", wantOK: false},
+		{controlPlane: "cp", machine: "other-0", wantOK: false},
+		{controlPlane: "cp", machine: "cp-0-extra-dash", want: 0, wantOK: true},
+		{controlPlane: "my-cluster", machine: "my-cluster-x", wantOK: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.machine, func(t *testing.T) {
+			got, ok := machineIndex(tt.controlPlane, tt.machine)
+			if ok != tt.wantOK {
+				t.Fatalf("machineIndex(%q, %q) ok = %v, want %v", tt.controlPlane, tt.machine, ok, tt.wantOK)
+			}
+			if ok && got != tt.want {
+				t.Errorf("machineIndex(%q, %q) = %d, want %d", tt.controlPlane, tt.machine, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPendingIndices(t *testing.T) {
 	tests := []struct {
 		name        string
