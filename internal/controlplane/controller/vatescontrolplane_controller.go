@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/utils/ptr"
@@ -268,16 +269,14 @@ func (r *VatesControlPlaneReconciler) reconcileMachines(ctx context.Context, vcp
 
 	// Scale up: create the missing indices.
 	//
-	// The member's name is the machine's name, so an index is not free as long
-	// as a member of that name is still in etcd -- whatever the Machine list
-	// says. Removing it here rather than only when a Machine is seen
-	// terminating is what makes the order hold when the Machine is already
-	// gone: a replacement is never added on top of a member that is still
-	// counted.
+	// An index is not free as long as an etcd member for it is still counted
+	// -- whatever the Machine list says. Removing it here rather than only
+	// when a Machine is seen terminating is what makes the order hold when
+	// the Machine is already gone: a replacement is never added on top of a
+	// member that is still counted.
 	for _, idx := range pendingIndices(desired, byIndex, terminating) {
 		if host, ok := etcdHost(byIndex, departing, desired); ok {
-			name := fmt.Sprintf("%s-%d", vcp.Name, idx)
-			if err := r.removeEtcdMembers(ctx, cluster, host, []string{name}); err != nil {
+			if err := r.removeStaleEtcdMembers(ctx, cluster, host, vcp.Name, idx); err != nil {
 				return nil, err
 			}
 		}
@@ -303,12 +302,12 @@ func (r *VatesControlPlaneReconciler) reconcileMachines(ctx context.Context, vcp
 //
 // A terminating Machine holds its index on purpose. It keeps its name until it
 // is gone, and it is gone only once the infrastructure object it references has
-// been deleted -- which the Machine controller does on its own. Recreating the
-// index now would recreate that object under the same name, and the two
-// controllers would fight over it: the Machine controller deleting it, this one
-// recreating it, with a VM created on every round and the Machine never
-// finishing its deletion. Owns(&Machine{}) requeues this reconcile once the
-// name is free.
+// been deleted -- which the Machine controller does on its own. (Recreating a
+// legacy "<controlPlane>-<index>" index now would recreate that object under
+// the same name, and the two controllers would fight over it: the Machine
+// controller deleting it, this one recreating it, with a VM created on every
+// round and the Machine never finishing its deletion.) Owns(&Machine{})
+// requeues this reconcile once the name is free.
 func pendingIndices(desired int, live, terminating map[int]clusterv1.Machine) []int {
 	var out []int
 	for idx := 0; idx < desired; idx++ {
@@ -406,25 +405,93 @@ func (r *VatesControlPlaneReconciler) etcdClient(ctx context.Context, cluster *c
 	return etcd.New(cfg, host)
 }
 
-// machineIndex extracts the numeric index from a Machine name shaped
-// <controlPlaneName>-<index>.
+// machineRandomLength is the length of the random suffix control plane
+// Machine names end with, following the Cluster API convention (KCP,
+// MachineSet, TalosControlPlane): every generated Machine name ends with a
+// random suffix, and infrastructure providers may rely on it.
+const machineRandomLength = 5
+
+// machineName builds the name of a control plane Machine:
+// vates-<index>-<random>, e.g. "vates-0-7n62g".
+//
+// The trailing random suffix follows the Cluster API convention (KCP,
+// MachineSet, TalosControlPlane): every generated Machine name ends with a
+// random suffix, and infrastructure providers may rely on it. The prefix is
+// fixed rather than the control plane name: the owning control plane is
+// already carried by the Machine's labels, and a fixed prefix keeps every
+// control plane Machine recognizable as such.
+func machineName(index int) string {
+	return fmt.Sprintf("%s-%d-%s", machineNamePrefix, index, utilrand.String(machineRandomLength))
+}
+
+// machineNamePrefix is the fixed prefix of control plane Machine names.
+const machineNamePrefix = "vates"
+
+// machineIndex extracts the numeric index from a control plane Machine name.
+// It accepts the current "vates-<index>-<random>" shape as well as the legacy
+// "<controlPlane>-<index>" and "<controlPlane>-<index>-<random>" shapes, so
+// Machines created before the naming change keep working across the upgrade.
 func machineIndex(controlPlaneName, machineName string) (int, bool) {
-	prefix := controlPlaneName + "-"
-	if !strings.HasPrefix(machineName, prefix) {
-		return 0, false
+	for _, prefix := range []string{machineNamePrefix + "-", controlPlaneName + "-"} {
+		rest, ok := strings.CutPrefix(machineName, prefix)
+		if !ok {
+			continue
+		}
+		head, _, _ := strings.Cut(rest, "-")
+		if idx, err := strconv.Atoi(head); err == nil {
+			return idx, true
+		}
 	}
-	idx, err := strconv.Atoi(strings.TrimPrefix(machineName, prefix))
+	return 0, false
+}
+
+// removeStaleEtcdMembers removes the etcd members an index left behind: the
+// legacy "<controlPlane>-<index>" member, any "<controlPlane>-<index>-<suffix>"
+// member and any "vates-<index>-<suffix>" member. The index is pending
+// precisely because no Machine holds it, so every such member is stale. A
+// member that is already gone is not an error: RemoveMemberNamed is a no-op
+// for it.
+func (r *VatesControlPlaneReconciler) removeStaleEtcdMembers(ctx context.Context, cluster *clusterv1.Cluster, host, controlPlaneName string, index int) error {
+	client, err := r.etcdClient(ctx, cluster, host)
 	if err != nil {
-		return 0, false
+		return err
 	}
-	return idx, true
+	members, err := client.Members(ctx)
+	if err != nil {
+		return err
+	}
+	roots := []string{
+		fmt.Sprintf("%s-%d", controlPlaneName, index),
+		fmt.Sprintf("%s-%d", machineNamePrefix, index),
+	}
+	var stale []string
+members:
+	for i := range members {
+		for _, root := range roots {
+			if members[i].Name == root || strings.HasPrefix(members[i].Name, root+"-") {
+				stale = append(stale, members[i].Name)
+				continue members
+			}
+		}
+	}
+	sort.Strings(stale)
+	for _, name := range stale {
+		removed, err := client.RemoveMemberNamed(ctx, name)
+		if err != nil {
+			return fmt.Errorf("removing the stale etcd member of %s: %w", name, err)
+		}
+		if removed {
+			log.FromContext(ctx).Info("Removed the stale etcd member of a departed control plane machine", "machine", name)
+		}
+	}
+	return nil
 }
 
 // createControlPlaneMachine creates one control plane Machine and the two
 // objects it references: a VatesConfig stamped from the bootstrap
 // template, and an XOMachine stamped from the infrastructure template.
 func (r *VatesControlPlaneReconciler) createControlPlaneMachine(ctx context.Context, vcp *controlplanev1alpha1.VatesControlPlane, cluster *clusterv1.Cluster, index int) error {
-	name := fmt.Sprintf("%s-%d", vcp.Name, index)
+	name := machineName(index)
 	selectorLabels := controlPlaneMachineLabels(cluster, vcp)
 	owner := metav1.NewControllerRef(vcp, controlplanev1alpha1.GroupVersion.WithKind("VatesControlPlane"))
 
