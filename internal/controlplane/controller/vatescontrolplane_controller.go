@@ -77,6 +77,7 @@ type VatesControlPlaneReconciler struct {
 // +kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=vatescontrolplanes/finalizers,verbs=update
 // +kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=vatescontrolplanetemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;machines,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=vates.infrastructure.cluster.x-k8s.io,resources=xomachines,verbs=get;list;watch;create;update;patch;delete
@@ -155,7 +156,12 @@ func (r *VatesControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	// 3. Report the contract status.
+	// 3. The control plane provider owns each Machine's UpToDate condition.
+	if err := r.reconcileMachineUpToDateConditions(ctx, vcp, machines); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Report the contract status.
 	//
 	// "Initialized" means the control plane can accept requests. We own the
 	// kubeconfig, so we ask the control plane directly instead of waiting for
@@ -697,6 +703,35 @@ func (r *VatesControlPlaneReconciler) controlPlaneReachable(ctx context.Context,
 	return err == nil
 }
 
+// reconcileMachineUpToDateConditions publishes the same version comparison used
+// by the control plane replica counter on each Machine. The patch helper merges
+// conditions so the Machine controller retains ownership of its own conditions.
+func (r *VatesControlPlaneReconciler) reconcileMachineUpToDateConditions(ctx context.Context, vcp *controlplanev1alpha1.VatesControlPlane, machines []clusterv1.Machine) error {
+	for i := range machines {
+		m := &machines[i]
+		helper, err := patch.NewHelper(m, r.Client)
+		if err != nil {
+			return err
+		}
+		condition := metav1.Condition{
+			Type:               clusterv1.MachineUpToDateCondition,
+			Status:             metav1.ConditionTrue,
+			Reason:             clusterv1.MachineUpToDateReason,
+			ObservedGeneration: m.Generation,
+		}
+		if m.Spec.Version != vcp.Spec.Version {
+			condition.Status = metav1.ConditionFalse
+			condition.Reason = clusterv1.MachineNotUpToDateReason
+			condition.Message = fmt.Sprintf("Kubernetes version %s does not match desired version %s", m.Spec.Version, vcp.Spec.Version)
+		}
+		apimeta.SetStatusCondition(&m.Status.Conditions, condition)
+		if err := helper.Patch(ctx, m, patch.WithOwnedConditions{Conditions: []string{clusterv1.MachineUpToDateCondition}}); err != nil {
+			return fmt.Errorf("patching Machine %s UpToDate condition: %w", m.Name, err)
+		}
+	}
+	return nil
+}
+
 // updateStatus fills the Cluster API control plane contract fields and the two
 // conditions the Cluster controller watches.
 func (r *VatesControlPlaneReconciler) updateStatus(vcp *controlplanev1alpha1.VatesControlPlane, cluster *clusterv1.Cluster, machines []clusterv1.Machine, reachable bool) {
@@ -716,7 +751,7 @@ func (r *VatesControlPlaneReconciler) updateStatus(vcp *controlplanev1alpha1.Vat
 		if apimeta.IsStatusConditionTrue(m.Status.Conditions, clusterv1.MachineAvailableCondition) {
 			available++
 		}
-		if m.Spec.Version == vcp.Spec.Version {
+		if apimeta.IsStatusConditionTrue(m.Status.Conditions, clusterv1.MachineUpToDateCondition) {
 			upToDate++
 		}
 		if m.Status.NodeRef.IsDefined() {
